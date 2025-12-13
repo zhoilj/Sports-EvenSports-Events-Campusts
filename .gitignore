@@ -1,0 +1,134 @@
+# ===========================
+# Roo/BMAD Configuration
+# ===========================
+.bmad/
+.claude/
+.roo/
+bmad-custom-modules-src
+bmad-custom-src
+.roomodes
+# ===========================
+# IDE & Editor Configuration
+# ===========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# ===========================
+# Operating System Files
+# ===========================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Linux
+*~
+.directory
+
+# ===========================
+# Dependencies
+# ===========================
+node_modules/
+vendor/
+bower_components/
+jspm_packages/
+.pnp/
+.pnp.js
+
+# ===========================
+# Build & Output
+# ===========================
+dist/
+build/
+out/
+target/
+*.exe
+*.dll
+*.so
+*.dylib
+*.class
+*.jar
+*.war
+*.ear
+
+# ===========================
+# Logs & Debug
+# ===========================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+secrets/
+
+# ===========================
+# Cache & Temporary Files
+# ===========================
+.cache/
+.temp/
+.tmp/
+*.tmp
+*.temp
+*.bak
+*.backup
+.eslintcache
+.stylelintcache
+.parcel-cache/
+.next/
+.nuxt/
+.turbo/
+
+# ===========================
+# Test & Coverage
+# ===========================
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+
+# ===========================
+# Package Manager Lock Files (optional - uncomment if needed)
+# ===========================
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ===========================
+# Miscellaneous
+# ===========================
+*.pid
+*.seed
+*.pid.lock
+.grunt
+.lock-wscript
+.node_repl_history
+.yarn-integrity
