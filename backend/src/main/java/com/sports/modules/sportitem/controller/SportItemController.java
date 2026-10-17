@@ -145,7 +145,7 @@ public class SportItemController {
         addTime(items, "男子800米", 1, false, generalRule);
         addTime(items, "男子1500米", 1, false, generalRule);
         addTime(items, "男子5000米", 1, false, generalRule);
-        addTime(items, "男子110米栏", 1, false, "栏高按学校正式竞赛规程执行。" + generalRule);
+        addTime(items, "男子110米栏", 1, false, "男子110米栏栏高按秩序册规定，降至相应的400米栏高度。" + generalRule);
         addTime(items, "男子4×100米接力", 1, true, generalRule);
         addTime(items, "男子4×400米接力", 1, true, generalRule);
         addField(items, "男子跳高", 1, generalRule);
@@ -159,7 +159,7 @@ public class SportItemController {
         addTime(items, "女子800米", 2, false, generalRule);
         addTime(items, "女子1500米", 2, false, generalRule);
         addTime(items, "女子3000米", 2, false, generalRule);
-        addTime(items, "女子100米栏", 2, false, "栏高按学校正式竞赛规程执行。" + generalRule);
+        addTime(items, "女子100米栏", 2, false, "女子100米栏栏高按秩序册规定，降至相应的400米栏高度。" + generalRule);
         addTime(items, "女子4×100米接力", 2, true, generalRule);
         addTime(items, "女子4×400米接力", 2, true, generalRule);
         addField(items, "女子跳高", 2, generalRule);
