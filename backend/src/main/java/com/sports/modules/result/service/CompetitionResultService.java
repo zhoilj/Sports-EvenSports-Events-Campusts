@@ -3,6 +3,7 @@ package com.sports.modules.result.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.sports.modules.result.entity.CompetitionResult;
+import com.sports.modules.result.entity.ResultAuditLog;
 import com.sports.modules.result.vo.CompetitionResultVO;
 
 import java.util.List;
@@ -54,4 +55,6 @@ public interface CompetitionResultService extends IService<CompetitionResult> {
     int publishScheduleResults(Long scheduleId);
 
     void deleteResult(Long id);
+
+    List<ResultAuditLog> getAuditLogs(Long id);
 }
