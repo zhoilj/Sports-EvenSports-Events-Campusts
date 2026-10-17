@@ -15,6 +15,7 @@
         <el-descriptions-item label="结束日期">{{ eventData.endDate }}</el-descriptions-item>
         <el-descriptions-item label="报名开始">{{ eventData.regStartDate }}</el-descriptions-item>
         <el-descriptions-item label="报名截止">{{ eventData.regEndDate }}</el-descriptions-item>
+        <el-descriptions-item label="每人限报项目数">{{ Number(eventData.maxProjectsPerAthlete ?? 3) === 0 ? '不限' : `${eventData.maxProjectsPerAthlete ?? 3}项` }}</el-descriptions-item>
         <el-descriptions-item label="举办地点">{{ eventData.location }}</el-descriptions-item>
         <el-descriptions-item label="主办单位">{{ eventData.organizer }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ eventData.contactPhone }}</el-descriptions-item>
@@ -37,10 +38,22 @@
       </template>
       <el-table :data="sportItems" border stripe>
         <el-table-column prop="name" label="项目名称" />
-        <el-table-column prop="categoryName" label="类别" width="100" />
-        <el-table-column prop="genderName" label="性别要求" width="100" />
-        <el-table-column prop="maxParticipants" label="人数上限" width="100" />
+        <el-table-column label="类别" width="100">
+          <template #default="{ row }">{{ getItemTypeName(row.type) }}</template>
+        </el-table-column>
+        <el-table-column label="性别要求" width="100">
+          <template #default="{ row }">{{ getGenderLimitName(row.genderLimit) }}</template>
+        </el-table-column>
+        <el-table-column label="人数/队伍上限" width="120">
+          <template #default="{ row }">{{ Number(row.maxParticipants ?? 0) > 0 ? row.maxParticipants : '不限' }}</template>
+        </el-table-column>
         <el-table-column prop="currentParticipants" label="已报名" width="100" />
+        <el-table-column label="参赛方式" width="100">
+          <template #default="{ row }">{{ row.participationMode === 'RELAY' ? '接力' : '个人' }}</template>
+        </el-table-column>
+        <el-table-column label="队员人数" width="100">
+          <template #default="{ row }">{{ row.participationMode === 'RELAY' ? row.teamMemberCount : '—' }}</template>
+        </el-table-column>
         <el-table-column prop="rules" label="比赛规则" />
         <el-table-column label="操作" width="120" v-if="canRegister">
           <template #default="{ row }">
@@ -48,9 +61,9 @@
               type="primary" 
               link 
               @click="handleRegisterItem(row)"
-              :disabled="row.currentParticipants >= row.maxParticipants"
+              :disabled="isFull(row)"
             >
-              {{ row.currentParticipants >= row.maxParticipants ? '已满' : '报名' }}
+              {{ isFull(row) ? '已满' : '报名' }}
             </el-button>
           </template>
         </el-table-column>
@@ -84,15 +97,39 @@
     <el-dialog v-model="registerDialogVisible" title="赛事报名" width="500px">
       <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" label-width="100px">
         <el-form-item label="运动项目" prop="sportItemId">
-          <el-select v-model="registerForm.sportItemId" placeholder="请选择">
-            <el-option 
-              v-for="item in availableItems" 
-              :key="item.id" 
-              :label="item.name" 
+          <el-select v-model="registerForm.sportItemId" placeholder="请选择" @change="handleSportItemChange">
+            <el-option
+              v-for="item in availableItems"
+              :key="item.id"
+              :label="item.name"
               :value="item.id"
-              :disabled="item.currentParticipants >= item.maxParticipants"
+              :disabled="isFull(item)"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item v-if="selectedSportItem?.participationMode === 'RELAY'" label="接力队名" prop="teamName">
+          <el-input v-model="registerForm.teamName" maxlength="100" show-word-limit placeholder="请输入接力队名称" />
+        </el-form-item>
+        <el-form-item v-if="selectedSportItem?.participationMode === 'RELAY'" label="接力队员" prop="memberUserIds">
+          <el-select
+            v-model="registerForm.memberUserIds"
+            multiple
+            filterable
+            remote
+            reserve-keyword
+            style="width: 100%"
+            placeholder="选择同学院队员，名单必须包含本人"
+            :remote-method="loadEligibleAthletes"
+            @visible-change="handleAthleteSelectVisible"
+          >
+            <el-option
+              v-for="athlete in eligibleAthletes"
+              :key="athlete.userId"
+              :label="`${athlete.realName}（${athlete.studentNo}）`"
+              :value="athlete.userId"
+            />
+          </el-select>
+          <div class="form-tip">该项目要求 {{ selectedSportItem?.teamMemberCount }} 名队员，队员必须来自同一学院。</div>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="registerForm.remark" type="textarea" :rows="3" placeholder="请输入备注信息" />
@@ -127,22 +164,38 @@ const registerLoading = ref(false)
 const registerFormRef = ref<FormInstance>()
 const registerForm = reactive({
   sportItemId: null as number | null,
-  remark: ''
+  remark: '',
+  teamName: '',
+  memberUserIds: [] as number[]
 })
+const eligibleAthletes = ref<any[]>([])
+const selectedSportItem = computed(() =>
+  sportItems.value.find(item => item.id === registerForm.sportItemId)
+)
 
 const registerRules: FormRules = {
   sportItemId: [{ required: true, message: '请选择运动项目', trigger: 'change' }]
 }
 
 const canRegister = computed(() => {
-  return userStore.userInfo?.role === 'STUDENT' && 
-         eventData.value.status === 'PUBLISHED' &&
-         new Date() <= new Date(eventData.value.regEndDate)
+  const start = eventData.value.regStartDate
+  const end = eventData.value.regEndDate
+  const now = new Date()
+  return userStore.userInfo?.role === 'STUDENT'
+    && Number(eventData.value.status) === 2
+    && !!start && !!end
+    && now >= new Date(`${start}T00:00:00`)
+    && now <= new Date(`${end}T23:59:59`)
 })
 
-const availableItems = computed(() => {
-  return sportItems.value.filter(item => item.currentParticipants < item.maxParticipants)
-})
+const availableItems = computed(() =>
+  sportItems.value.filter(item => Number(item.status) === 1 && !isFull(item))
+)
+
+function isFull(item: any) {
+  const limit = Number(item.maxParticipants ?? 0)
+  return limit > 0 && Number(item.currentParticipants ?? 0) >= limit
+}
 
 onMounted(() => {
   loadEventDetail()
@@ -178,19 +231,18 @@ function goBack() {
   router.push('/events')
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    DRAFT: 'info',
-    PUBLISHED: 'primary',
-    ONGOING: 'success',
-    ENDED: 'warning',
-    CANCELLED: 'danger'
+function getStatusType(status: string | number): 'info' | 'primary' | 'success' | 'warning' {
+  const map: Record<string, 'info' | 'primary' | 'success' | 'warning'> = {
+    '1': 'info',
+    '2': 'primary',
+    '3': 'success',
+    '4': 'warning'
   }
-  return map[status] || 'info'
+  return map[String(status)] || 'info'
 }
 
-function getScheduleStatusType(status: string) {
-  const map: Record<string, string> = {
+function getScheduleStatusType(status: string): 'info' | 'primary' | 'success' | 'danger' {
+  const map: Record<string, 'info' | 'primary' | 'success' | 'danger'> = {
     PENDING: 'info',
     ONGOING: 'primary',
     COMPLETED: 'success',
@@ -199,16 +251,65 @@ function getScheduleStatusType(status: string) {
   return map[status] || 'info'
 }
 
-function handleRegister() {
+function getItemTypeName(type: string) {
+  const map: Record<string, string> = {
+    TRACK: '径赛',
+    FIELD: '田赛',
+    BALL: '球类',
+    SWIMMING: '游泳',
+    WATER: '水上项目',
+    OTHER: '其他'
+  }
+  return map[type] || type || '—'
+}
+
+function getGenderLimitName(limit: number) {
+  const map: Record<number, string> = { 0: '不限', 1: '仅男性', 2: '仅女性' }
+  return map[Number(limit)] || '不限'
+}
+
+function resetRegisterForm() {
   registerForm.sportItemId = null
   registerForm.remark = ''
+  registerForm.teamName = ''
+  registerForm.memberUserIds = []
+}
+
+function handleRegister() {
+  resetRegisterForm()
   registerDialogVisible.value = true
 }
 
 function handleRegisterItem(item: any) {
+  resetRegisterForm()
   registerForm.sportItemId = item.id
-  registerForm.remark = ''
   registerDialogVisible.value = true
+  handleSportItemChange()
+}
+
+function handleSportItemChange() {
+  const item = selectedSportItem.value
+  registerForm.teamName = ''
+  if (item?.participationMode === 'RELAY') {
+    const currentUserId = Number(userStore.userInfo?.userId)
+    registerForm.memberUserIds = currentUserId ? [currentUserId] : []
+    loadEligibleAthletes('')
+  } else {
+    registerForm.memberUserIds = []
+  }
+}
+
+function handleAthleteSelectVisible(visible: boolean) {
+  if (visible && eligibleAthletes.value.length === 0) {
+    loadEligibleAthletes('')
+  }
+}
+
+async function loadEligibleAthletes(keyword: string) {
+  const res = await get('/registrations/eligible-athletes', { keyword })
+  if (res.code === 200) {
+    eligibleAthletes.value = res.data || []
+  }
 }
 
 async function submitRegister() {
@@ -217,10 +318,24 @@ async function submitRegister() {
     if (!valid) return
     registerLoading.value = true
     try {
+      const selectedItem = selectedSportItem.value
+      if (selectedItem?.participationMode === 'RELAY') {
+        if (!registerForm.teamName.trim()) {
+          ElMessage.warning('请填写接力队名称')
+          return
+        }
+        if (registerForm.memberUserIds.length !== Number(selectedItem.teamMemberCount)) {
+          ElMessage.warning(`该项目要求 ${selectedItem.teamMemberCount} 名队员，请检查名单`)
+          return
+        }
+      }
       await post('/registrations', {
         eventId: eventData.value.id,
         sportItemId: registerForm.sportItemId,
-        remark: registerForm.remark
+        remark: registerForm.remark,
+        ...(selectedItem?.participationMode === 'RELAY'
+          ? { teamName: registerForm.teamName.trim(), memberUserIds: registerForm.memberUserIds }
+          : {})
       })
       ElMessage.success('报名成功，请等待审核')
       registerDialogVisible.value = false
@@ -233,6 +348,11 @@ async function submitRegister() {
 </script>
 
 <style scoped>
+.form-tip {
+  margin-top: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
 .card-header {
   display: flex;
   justify-content: space-between;

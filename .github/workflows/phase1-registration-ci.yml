@@ -1,0 +1,159 @@
+name: Phase 1 Registration CI
+
+on:
+  push:
+    branches:
+      - feat/phase1-registration-model
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'docs/04-DB/schema.sql'
+      - 'docs/04-DB/migrations/**'
+      - '.github/workflows/phase1-registration-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend compile and tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Compile and run tests
+        run: mvn -B -f backend/pom.xml test
+
+  frontend:
+    name: Frontend type check and build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Type check and production build
+        working-directory: frontend
+        run: npm run build:check
+
+  migration-safety:
+    name: Migration safety checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Ensure incremental migration does not drop tables or truncate data
+        run: |
+          if grep -Eiq '^[[:space:]]*(DROP[[:space:]]+TABLE|TRUNCATE[[:space:]]+TABLE)' docs/04-DB/migrations/V001__phase1_registration_model.sql; then
+            echo "Unsafe destructive SQL found in incremental migration."
+            exit 1
+          fi
+          if grep -Ev '^[[:space:]]*(--|$)' backend/src/main/resources/db/data.sql; then
+            echo "Deprecated seed SQL must remain non-executable."
+            exit 1
+          fi
+
+  mysql-registration-integration:
+    name: MySQL migration and registration API integration
+    runs-on: ubuntu-24.04
+    needs:
+      - backend
+      - frontend
+      - migration-safety
+    services:
+      mysql:
+        image: mysql:8.0.44
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sports_events
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      DB_URL: jdbc:mysql://127.0.0.1:3306/sports_events?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      DB_USERNAME: root
+      DB_PASSWORD: root
+      JWT_SECRET: phase1-registration-ci-secret-key-2026-10-18-0123456789
+      MYSQL_PWD: root
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-java@v6.1.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+      - name: Initialize isolated legacy schema and seed migration fixtures
+        run: |
+          set -euo pipefail
+          mysql --protocol=tcp -h 127.0.0.1 -uroot --default-character-set=utf8mb4 < docs/04-DB/schema.sql
+          mysql --protocol=tcp -h 127.0.0.1 -uroot --database=sports_events <<'SQL'
+          INSERT INTO registration (event_id, sport_item_id, user_id, status, remark, is_deleted)
+          SELECT e.id, si.id, u.id, 1, 'migration-fixture-pending', 0
+          FROM event e
+          JOIN sport_item si ON si.event_id = e.id AND si.id = 1
+          JOIN sys_user u ON u.username = 'student01';
+
+          INSERT INTO registration (event_id, sport_item_id, user_id, status, remark, is_deleted)
+          SELECT e.id, si.id, u.id, 2, 'migration-fixture-approved', 0
+          FROM event e
+          JOIN sport_item si ON si.event_id = e.id AND si.id = 2
+          JOIN sys_user u ON u.username = 'student02';
+          SQL
+          test "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM sports_events.registration")" = "2"
+      - name: Apply migration and verify data preservation and idempotency
+        run: |
+          set -euo pipefail
+          before_users="$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.sys_user')"
+          before_events="$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.event')"
+          before_items="$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.sport_item')"
+          before_registrations="$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.registration')"
+
+          mysql --protocol=tcp -h 127.0.0.1 -uroot --database=sports_events < docs/04-DB/migrations/V001__phase1_registration_model.sql
+
+          assert_eq() {
+            expected="$1"
+            actual="$2"
+            label="$3"
+            if [ "$expected" != "$actual" ]; then
+              echo "FAIL: $label expected=$expected actual=$actual"
+              exit 1
+            fi
+            echo "PASS: $label = $actual"
+          }
+
+          assert_eq "$before_users" "$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.sys_user')" "users preserved"
+          assert_eq "$before_events" "$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.event')" "events preserved"
+          assert_eq "$before_items" "$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.sport_item')" "sport items preserved"
+          assert_eq "$before_registrations" "$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.registration')" "registrations preserved"
+          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT current_participants FROM sports_events.sport_item WHERE id=1")" "pending registration count"
+          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT current_participants FROM sports_events.sport_item WHERE id=2")" "approved registration count"
+          assert_eq "0" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='sports_events' AND table_name='registration' AND index_name='uk_user_item'")" "obsolete unique index removed"
+          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='sports_events' AND table_name='registration' AND index_name='idx_registration_event_item_user_status'")" "registration query index created"
+          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='sports_events' AND table_name='registration_member'")" "relay roster table created"
+          assert_eq "0" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM sports_events.sys_user WHERE username='student01' AND (college_id IS NULL OR class_id IS NULL)")" "college/class IDs backfilled"
+
+          # The migration is expected to be safely repeatable on the same database.
+          mysql --protocol=tcp -h 127.0.0.1 -uroot --database=sports_events < docs/04-DB/migrations/V001__phase1_registration_model.sql
+          assert_eq "$before_registrations" "$(mysql -N -B -h 127.0.0.1 -uroot -e 'SELECT COUNT(*) FROM sports_events.registration')" "registrations preserved after second migration"
+          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT current_participants FROM sports_events.sport_item WHERE id=1")" "capacity count stable after second migration"
+      - name: Run database-backed registration API integration tests
+        run: mvn -B -f backend/pom.xml -Pmysql-integration verify

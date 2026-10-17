@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.sports.modules.registration.dto.RegistrationDTO;
 import com.sports.modules.registration.entity.Registration;
 import com.sports.modules.registration.vo.RegistrationVO;
+import com.sports.modules.registration.vo.RegistrationMemberVO;
 
 import java.util.List;
 
@@ -36,9 +37,14 @@ public interface RegistrationService extends IService<Registration> {
     IPage<RegistrationVO> pageRegistrations(Integer current, Integer size, Long eventId, Long sportItemId, String status);
 
     /**
-     * 获取我的报名列表
+     * 获取我的报名列表（分页，支持状态筛选；接力队员也能看到所属队伍）
      */
-    List<RegistrationVO> getMyRegistrations();
+    IPage<RegistrationVO> getMyRegistrations(Integer current, Integer size, String status);
+
+    /**
+     * 查询同学院可选接力队员，仅返回必要的学生信息
+     */
+    List<RegistrationMemberVO> listEligibleAthletes(String keyword);
 
     /**
      * 检查是否已报名

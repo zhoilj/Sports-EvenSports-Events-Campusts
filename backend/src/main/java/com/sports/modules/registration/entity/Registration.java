@@ -48,6 +48,30 @@ public class Registration extends BaseEntity {
     private Long userId;
 
     /**
+     * 报名类型（INDIVIDUAL-个人 RELAY-接力）；旧记录默认为个人报名
+     */
+    @TableField("registration_type")
+    private String registrationType = "INDIVIDUAL";
+
+    /**
+     * 接力队伍名称
+     */
+    @TableField("team_name")
+    private String teamName;
+
+    /**
+     * 报名时的学院名称快照
+     */
+    @TableField("college_snapshot")
+    private String collegeSnapshot;
+
+    /**
+     * 报名时的班级名称快照
+     */
+    @TableField("class_snapshot")
+    private String classSnapshot;
+
+    /**
      * 状态（1-待审核 2-已通过 3-已拒绝 4-已取消）
      */
     private Integer status;

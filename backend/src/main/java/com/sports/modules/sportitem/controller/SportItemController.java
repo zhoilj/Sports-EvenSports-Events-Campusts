@@ -66,6 +66,7 @@ public class SportItemController {
         if (sportItem.getCurrentParticipants() == null) {
             sportItem.setCurrentParticipants(0);
         }
+        normalizeParticipationConfig(sportItem, null);
         sportItemService.save(sportItem);
         return Result.success(sportItem.getId());
     }
@@ -79,6 +80,7 @@ public class SportItemController {
             throw new BusinessException(ResultCode.SPORT_ITEM_NOT_FOUND);
         }
         sportItem.setId(id);
+        normalizeParticipationConfig(sportItem, existing);
         sportItemService.updateById(sportItem);
         return Result.success();
     }
@@ -93,6 +95,32 @@ public class SportItemController {
         }
         sportItemService.removeById(id);
         return Result.success();
+    }
+
+    private void normalizeParticipationConfig(SportItem item, SportItem existing) {
+        String mode = item.getParticipationMode();
+        if (!org.springframework.util.StringUtils.hasText(mode) && existing != null) {
+            mode = existing.getParticipationMode();
+        }
+        if (!org.springframework.util.StringUtils.hasText(mode)) {
+            mode = "INDIVIDUAL";
+        }
+        mode = mode.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!"INDIVIDUAL".equals(mode) && !"RELAY".equals(mode)) {
+            throw new BusinessException("参赛模式只能为 INDIVIDUAL 或 RELAY");
+        }
+        item.setParticipationMode(mode);
+        if ("RELAY".equals(mode)) {
+            Integer memberCount = item.getTeamMemberCount() != null
+                    ? item.getTeamMemberCount()
+                    : existing == null ? null : existing.getTeamMemberCount();
+            if (memberCount == null || memberCount < 2 || memberCount > 8) {
+                throw new BusinessException("接力项目必须配置2至8名队员");
+            }
+            item.setTeamMemberCount(memberCount);
+        } else {
+            item.setTeamMemberCount(null);
+        }
     }
 
     @Operation(summary = "切换项目状态")

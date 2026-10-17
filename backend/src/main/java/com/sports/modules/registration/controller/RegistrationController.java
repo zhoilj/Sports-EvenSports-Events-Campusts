@@ -5,6 +5,7 @@ import com.sports.common.result.Result;
 import com.sports.modules.registration.dto.RegistrationDTO;
 import com.sports.modules.registration.service.RegistrationService;
 import com.sports.modules.registration.vo.RegistrationVO;
+import com.sports.modules.registration.vo.RegistrationMemberVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -82,8 +83,18 @@ public class RegistrationController {
 
     @Operation(summary = "获取我的报名列表")
     @GetMapping("/my")
-    public Result<List<RegistrationVO>> getMyRegistrations() {
-        return Result.success(registrationService.getMyRegistrations());
+    public Result<PageResult<RegistrationVO>> getMyRegistrations(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String status) {
+        return Result.success(PageResult.of(registrationService.getMyRegistrations(current, size, status)));
+    }
+
+    @Operation(summary = "查询同学院可选接力队员")
+    @GetMapping("/eligible-athletes")
+    public Result<List<RegistrationMemberVO>> listEligibleAthletes(
+            @RequestParam(required = false) String keyword) {
+        return Result.success(registrationService.listEligibleAthletes(keyword));
     }
 
     @Operation(summary = "检查是否已报名")

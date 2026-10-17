@@ -56,6 +56,18 @@ public class SysUser extends BaseEntity {
     private String studentNo;
 
     /**
+     * 标准化学院ID；保留 college 文本字段兼容旧数据
+     */
+    @TableField("college_id")
+    private Long collegeId;
+
+    /**
+     * 标准化班级ID；保留 className 文本字段兼容旧数据
+     */
+    @TableField("class_id")
+    private Long classId;
+
+    /**
      * 学院
      */
     @TableField("department")

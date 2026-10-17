@@ -77,6 +77,9 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, Event> implements
         if (event.getStatus() == null) {
             event.setStatus(STATUS_DRAFT);
         }
+        if (event.getMaxProjectsPerAthlete() == null) {
+            event.setMaxProjectsPerAthlete(3);
+        }
 
         // 设置创建人
         event.setCreatorId(SecurityUtils.getUserId());
@@ -101,7 +104,11 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, Event> implements
         // 验证日期
         validateEventDates(eventDTO);
 
+        Integer existingLimit = event.getMaxProjectsPerAthlete();
         BeanUtils.copyProperties(eventDTO, event, "status", "creatorId");
+        event.setMaxProjectsPerAthlete(eventDTO.getMaxProjectsPerAthlete() != null
+                ? eventDTO.getMaxProjectsPerAthlete()
+                : (existingLimit != null ? existingLimit : 3));
         this.updateById(event);
     }
 

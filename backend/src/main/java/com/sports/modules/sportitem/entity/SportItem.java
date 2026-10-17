@@ -5,6 +5,9 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.sports.common.entity.BaseEntity;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -57,10 +60,25 @@ public class SportItem extends BaseEntity {
     private Integer maxParticipants;
 
     /**
-     * 当前报名人数
+     * 当前有效报名数；接力项目按队伍计数
      */
     @TableField("current_participants")
     private Integer currentParticipants;
+
+    /**
+     * 参赛模式（INDIVIDUAL-个人项目 RELAY-接力项目）
+     */
+    @TableField("participation_mode")
+    @Pattern(regexp = "INDIVIDUAL|RELAY", message = "参赛模式只能为 INDIVIDUAL 或 RELAY")
+    private String participationMode;
+
+    /**
+     * 接力项目要求的队员人数；个人项目为空
+     */
+    @TableField("team_member_count")
+    @Min(value = 2, message = "接力队员人数不能少于2人")
+    @Max(value = 8, message = "接力队员人数不能超过8人")
+    private Integer teamMemberCount;
 
     /**
      * 比赛规则说明

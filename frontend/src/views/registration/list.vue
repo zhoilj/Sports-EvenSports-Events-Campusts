@@ -27,7 +27,11 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="eventName" label="赛事名称" min-width="150" />
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
-        <el-table-column prop="userName" label="报名人" width="100" />
+        <el-table-column label="参赛方式" width="100">
+          <template #default="{ row }">{{ row.registrationType === 'RELAY' ? '接力' : '个人' }}</template>
+        </el-table-column>
+        <el-table-column prop="teamName" label="队伍名称" width="140" />
+        <el-table-column prop="realName" label="报名人" width="100" />
         <el-table-column prop="studentNo" label="学号" width="120" />
         <el-table-column prop="phone" label="联系电话" width="120" />
         <el-table-column prop="statusName" label="状态" width="100">
@@ -66,16 +70,22 @@
       <el-descriptions :column="2" border>
         <el-descriptions-item label="赛事名称">{{ currentRow.eventName }}</el-descriptions-item>
         <el-descriptions-item label="运动项目">{{ currentRow.sportItemName }}</el-descriptions-item>
-        <el-descriptions-item label="报名人">{{ currentRow.userName }}</el-descriptions-item>
+        <el-descriptions-item label="参赛方式">{{ currentRow.registrationType === 'RELAY' ? '接力' : '个人' }}</el-descriptions-item>
+        <el-descriptions-item label="队伍名称">{{ currentRow.teamName || '—' }}</el-descriptions-item>
+        <el-descriptions-item label="接力队员" :span="2">
+          <span v-if="currentRow.members?.length">{{ formatMemberRoster(currentRow.members) }}</span>
+          <span v-else>—</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="报名人">{{ currentRow.realName }}</el-descriptions-item>
         <el-descriptions-item label="学号">{{ currentRow.studentNo }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ currentRow.phone }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentRow.status)">{{ currentRow.statusName }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="报名时间">{{ currentRow.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="审核时间">{{ currentRow.auditTime }}</el-descriptions-item>
-        <el-descriptions-item label="审核人">{{ currentRow.auditorName }}</el-descriptions-item>
-        <el-descriptions-item label="审核意见">{{ currentRow.auditRemark }}</el-descriptions-item>
+        <el-descriptions-item label="审核时间">{{ currentRow.reviewTime }}</el-descriptions-item>
+        <el-descriptions-item label="审核人">{{ currentRow.reviewerName }}</el-descriptions-item>
+        <el-descriptions-item label="审核意见">{{ currentRow.reviewRemark }}</el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ currentRow.remark }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -143,8 +153,8 @@ async function loadData() {
   try {
     const res = await get('/registrations', queryParams)
     if (res.code === 200) {
-      tableData.value = res.data.records
-      total.value = res.data.total
+      tableData.value = res.data.records || []
+      total.value = Number(res.data.total || 0)
     }
   } finally {
     loading.value = false
@@ -158,14 +168,20 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
+  const map: Record<string, 'warning' | 'success' | 'danger' | 'info'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',
     CANCELLED: 'info'
   }
   return map[status] || 'info'
+}
+
+function formatMemberRoster(members: any[] = []): string {
+  return members.map((member: any) =>
+    `${member.memberOrder}. ${member.realName}（${member.studentNo}）`
+  ).join('、')
 }
 
 function handleView(row: any) {
@@ -192,7 +208,7 @@ async function submitReject() {
     if (!valid) return
     rejectLoading.value = true
     try {
-      await post(`/registrations/${rejectingId.value}/reject`, { reason: rejectForm.reason })
+      await post(`/registrations/${rejectingId.value}/reject`, undefined, { params: { reason: rejectForm.reason } })
       ElMessage.success('已拒绝')
       rejectDialogVisible.value = false
       loadData()

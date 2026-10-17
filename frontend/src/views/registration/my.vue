@@ -25,14 +25,23 @@
       <el-table :data="tableData" v-loading="loading" border stripe>
         <el-table-column prop="eventName" label="赛事名称" min-width="150" />
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
+        <el-table-column label="参赛方式" width="100">
+          <template #default="{ row }">{{ row.registrationType === 'RELAY' ? '接力' : '个人' }}</template>
+        </el-table-column>
+        <el-table-column prop="teamName" label="队伍名称" width="140" />
+        <el-table-column label="接力队员" min-width="220">
+          <template #default="{ row }">
+            {{ formatMemberNames(row.members) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="statusName" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ row.statusName }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="报名时间" width="160" />
-        <el-table-column prop="auditTime" label="审核时间" width="160" />
-        <el-table-column prop="auditRemark" label="审核意见" min-width="150" />
+        <el-table-column prop="reviewTime" label="审核时间" width="160" />
+        <el-table-column prop="reviewRemark" label="审核意见" min-width="150" />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleViewEvent(row)">查看赛事</el-button>
@@ -88,8 +97,8 @@ async function loadData() {
   try {
     const res = await get('/registrations/my', queryParams)
     if (res.code === 200) {
-      tableData.value = res.data.records
-      total.value = res.data.total
+      tableData.value = res.data.records || []
+      total.value = Number(res.data.total || 0)
     }
   } finally {
     loading.value = false
@@ -102,14 +111,18 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
+  const map: Record<string, 'warning' | 'success' | 'danger' | 'info'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',
     CANCELLED: 'info'
   }
   return map[status] || 'info'
+}
+
+function formatMemberNames(members: any[] = []): string {
+  return members.map((member: any) => member.realName).filter(Boolean).join('、') || '—'
 }
 
 function handleViewEvent(row: any) {

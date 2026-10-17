@@ -148,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules, UploadInstance } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
 
@@ -200,7 +200,13 @@ const importFile = ref<File | null>(null)
 
 onMounted(() => {
   loadEventOptions()
+  loadSportItemOptions()
   loadData()
+})
+
+watch(() => queryParams.eventId, (eventId) => {
+  queryParams.sportItemId = null
+  loadSportItemOptions(eventId ?? undefined)
 })
 
 async function loadEventOptions() {
@@ -210,7 +216,7 @@ async function loadEventOptions() {
   }
 }
 
-async function loadSportItemOptions(eventId: number) {
+async function loadSportItemOptions(eventId?: number) {
   const res = await get('/sport-items', { eventId, size: 100 })
   if (res.code === 200) {
     sportItemOptions.value = res.data.records || []
