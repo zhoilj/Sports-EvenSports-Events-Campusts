@@ -193,7 +193,7 @@ async function loadData() {
 function resetQuery() {
   queryParams.name = ''
   queryParams.type = ''
-  queryParams.status = ''
+  queryParams.status = null
   queryParams.current = 1
   loadData()
 }
