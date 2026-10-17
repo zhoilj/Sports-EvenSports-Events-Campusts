@@ -5,7 +5,7 @@
         <div class="card-header">
           <div>
             <strong>学院团体积分与奖牌榜</strong>
-            <div class="subheading">统计范围为正式发布的决赛成绩；预赛、半决赛成绩不计入团体积分。</div>
+            <div class="subheading">统计正式发布的决赛成绩；按学校规程依次以总积分、破纪录项次、第一名至第八名数量排序。</div>
           </div>
           <el-button type="success" :disabled="!eventId" @click="exportStandings">导出积分榜 CSV</el-button>
         </div>
@@ -21,21 +21,27 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="standings" v-loading="loading" border stripe>
+      <el-form-item label="排名类别">
+        <el-select v-model="categoryFilter" placeholder="选择排名类别" style="width: 220px">
+          <el-option v-for="category in categories" :key="category" :label="category" :value="category" />
+        </el-select>
+      </el-form-item>
+      <el-table :data="filteredStandings" v-loading="loading" border stripe>
         <el-table-column label="排名" width="80">
-          <template #default="{ $index }">
-            <el-tag v-if="$index === 0" type="warning">第1名</el-tag>
-            <el-tag v-else-if="$index === 1" type="info">第2名</el-tag>
-            <el-tag v-else-if="$index === 2" type="success">第3名</el-tag>
-            <span v-else>{{ $index + 1 }}</span>
+          <template #default="{ row }">
+            <el-tag v-if="row.rank === 1" type="warning">第1名</el-tag>
+            <el-tag v-else-if="row.rank === 2" type="info">第2名</el-tag>
+            <el-tag v-else-if="row.rank === 3" type="success">第3名</el-tag>
+            <span v-else>第{{ row.rank }}名</span>
           </template>
         </el-table-column>
-        <el-table-column prop="college" label="学院" min-width="220" />
+        <el-table-column prop="college" :label="categoryFilter === '乙组年级专业' ? '年级/专业班级' : '学院/参赛单位'" min-width="220" />
         <el-table-column prop="points" label="总积分" width="110" sortable />
         <el-table-column prop="gold" label="金牌" width="90" sortable />
         <el-table-column prop="silver" label="银牌" width="90" sortable />
         <el-table-column prop="bronze" label="铜牌" width="90" sortable />
-        <el-table-column prop="resultCount" label="有效决赛成绩数" width="150" />
+        <el-table-column prop="recordCount" label="破纪录项次" width="110" />
+        <el-table-column prop="resultCount" label="决赛成绩数" width="130" />
       </el-table>
 
       <el-divider />
@@ -45,6 +51,7 @@
           <div class="subheading">由管理员配置。正式发布成绩时按名次自动计算积分；同名次选手使用相同名次对应的积分。</div>
         </div>
         <div class="rule-actions">
+          <el-button v-if="canEditRules" @click="applyOfficialRules">套用正式规程积分</el-button>
           <el-button v-if="canEditRules" @click="addRule">添加名次</el-button>
           <el-button v-if="canEditRules" type="primary" :loading="savingRules" @click="saveRules" :disabled="!eventId">保存规则</el-button>
         </div>
@@ -87,6 +94,9 @@ const canEditRules = computed(() => userStore.userInfo?.role === 'ADMIN')
 const events = ref<any[]>([])
 const eventId = ref<number | null>(null)
 const standings = ref<any[]>([])
+const categoryFilter = ref('甲组男女团体')
+const categories = computed(() => Array.from(new Set(standings.value.map(row => row.category as string))))
+const filteredStandings = computed(() => standings.value.filter(row => !categoryFilter.value || row.category === categoryFilter.value))
 const rules = ref<any[]>([])
 const loading = ref(false)
 const savingRules = ref(false)
@@ -110,7 +120,10 @@ async function loadAll() {
       get('/reports/standings', { eventId: eventId.value }),
       get('/scoring-rules', { eventId: eventId.value })
     ])
-    if (standingRes.code === 200) standings.value = standingRes.data || []
+    if (standingRes.code === 200) {
+      standings.value = standingRes.data || []
+      if (!categories.value.includes(categoryFilter.value) && categories.value.length) categoryFilter.value = categories.value[0]
+    }
     if (ruleRes.code === 200) rules.value = (ruleRes.data || []).map((item: any) => ({
       placeNo: item.placeNo,
       points: item.points,
@@ -119,6 +132,15 @@ async function loadAll() {
   } finally {
     loading.value = false
   }
+}
+
+async function applyOfficialRules() {
+  await ElMessageBox.confirm('将把名次积分设置为第1至第8名依次9、7、6、5、4、3、2、1分。接力和集体项目的倍率及参与分需在项目管理中另行配置。确认套用？', '正式规程积分模板', { type: 'warning' })
+  rules.value = [9, 7, 6, 5, 4, 3, 2, 1].map((points, index) => ({
+    placeNo: index + 1,
+    points,
+    ruleName: `第${index + 1}名`
+  }))
 }
 
 function addRule() {
