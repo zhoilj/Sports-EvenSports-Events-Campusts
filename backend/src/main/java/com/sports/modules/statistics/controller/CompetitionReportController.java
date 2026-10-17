@@ -130,7 +130,7 @@ public class CompetitionReportController {
                 .orderByAsc(Schedule::getStartTime)
                 .orderByAsc(Schedule::getSportItemId)
                 .orderByAsc(Schedule::getRoundNo));
-        StringBuilder csv = new StringBuilder("\uFEFF赛事,比赛日期,开始时间,结束时间,项目,轮次,组别,道次/顺序,参赛者/队伍,学号,学院,班级/队员名单,检录状态,场地,裁判\r\n");
+        StringBuilder csv = new StringBuilder("\uFEFF赛事,比赛日期,开始时间,结束时间,项目,轮次,组别,道次/顺序,检录编号,参赛者/队伍,学号,学院,班级/队员名单,检录状态,场地,裁判\r\n");
         for (Schedule schedule : schedules) {
             SportItem item = sportItemService.getById(schedule.getSportItemId());
             List<ScheduleEntryVO> entries = scheduleEntryService.listEntryDetails(schedule.getId());
@@ -155,6 +155,7 @@ public class CompetitionReportController {
                 .append(csv(roundName(schedule.getRoundType()))).append(',')
                 .append(csv(entry == null ? schedule.getGroupNo() : entry.getGroupNo())).append(',')
                 .append(csv(order)).append(',')
+                .append(csv(entry == null ? "" : entry.getCheckinCode())).append(',')
                 .append(csv(entry == null ? "" : entry.getParticipantName())).append(',')
                 .append(csv(entry == null ? "" : entry.getStudentNo())).append(',')
                 .append(csv(entry == null ? "" : entry.getCollege())).append(',')
