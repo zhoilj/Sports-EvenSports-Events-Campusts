@@ -1,15 +1,14 @@
 <template>
   <div class="page-container">
     <el-card shadow="never">
-      <!-- 搜索表单 -->
       <el-form :inline="true" class="search-form">
         <el-form-item label="赛事">
-          <el-select v-model="queryParams.eventId" placeholder="请选择" clearable filterable>
+          <el-select v-model="queryParams.eventId" placeholder="选择赛事" clearable filterable @change="onQueryEventChange">
             <el-option v-for="item in eventOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="运动项目">
-          <el-select v-model="queryParams.sportItemId" placeholder="请选择" clearable filterable>
+          <el-select v-model="queryParams.sportItemId" placeholder="选择项目" clearable filterable>
             <el-option v-for="item in sportItemOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
@@ -19,48 +18,52 @@
         </el-form-item>
       </el-form>
 
-      <!-- 操作按钮 -->
-      <div class="mb-10">
-        <el-button type="primary" @click="handleAdd">
-          <el-icon><Plus /></el-icon>录入成绩
-        </el-button>
-        <el-button type="success" @click="handleExport">
-          <el-icon><Download /></el-icon>导出成绩
-        </el-button>
-        <el-button type="warning" @click="handleImport">
-          <el-icon><Upload /></el-icon>导入成绩
-        </el-button>
+      <div class="toolbar">
+        <el-button type="primary" @click="handleAdd">录入成绩</el-button>
+        <el-button type="success" @click="handleExport" :disabled="!queryParams.eventId">导出正式成绩 CSV</el-button>
+        <el-button @click="router.push('/standings')">学院积分与奖牌榜</el-button>
       </div>
 
-      <!-- 数据表格 -->
       <el-table :data="tableData" v-loading="loading" border stripe>
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="eventName" label="赛事名称" min-width="150" />
-        <el-table-column prop="sportItemName" label="运动项目" width="120" />
-        <el-table-column prop="realName" label="参赛者" width="100" />
+        <el-table-column prop="eventName" label="赛事" min-width="150" />
+        <el-table-column prop="sportItemName" label="运动项目" min-width="130" />
+        <el-table-column label="参赛者/队伍" min-width="150">
+          <template #default="{ row }">{{ row.relayTeamName || row.realName || row.username || '—' }}</template>
+        </el-table-column>
         <el-table-column prop="studentNo" label="学号" width="120" />
-        <el-table-column prop="score" label="成绩" width="100" />
-        <el-table-column prop="unit" label="单位" width="80" />
-        <el-table-column prop="ranking" label="名次" width="80">
+        <el-table-column prop="college" label="学院" min-width="130" />
+        <el-table-column label="成绩" min-width="120">
+          <template #default="{ row }">{{ row.scoreText || row.score || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="成绩状态" width="105">
           <template #default="{ row }">
-            <el-tag v-if="row.ranking === 1" type="warning">🥇 第1名</el-tag>
-            <el-tag v-else-if="row.ranking === 2" type="info">🥈 第2名</el-tag>
-            <el-tag v-else-if="row.ranking === 3" type="danger">🥉 第3名</el-tag>
-            <span v-else>第{{ row.ranking }}名</span>
+            <el-tag :type="resultType(row.resultStatus)">{{ resultStatusName(row.resultStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="points" label="积分" width="80" />
-        <el-table-column prop="recorderName" label="记录人" width="100" />
-        <el-table-column prop="recordTime" label="记录时间" width="160" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column prop="ranking" label="名次" width="75" />
+        <el-table-column prop="points" label="积分" width="70" />
+        <el-table-column label="复核状态" width="105">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-tag :type="reviewType(row.reviewStatus)">{{ reviewStatusName(row.reviewStatus) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="发布状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isPublished === 1 ? 'success' : 'info'">{{ row.isPublished === 1 ? '已发布' : '未发布' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="recorderName" label="录入人" width="100" />
+        <el-table-column label="操作" min-width="260" fixed="right">
+          <template #default="{ row }">
+            <el-button v-if="row.isPublished !== 1" link type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="row.isPublished !== 1 && row.reviewStatus !== 2" link type="success" @click="reviewResult(row, 2)">复核通过</el-button>
+            <el-button v-if="row.isPublished !== 1" link type="warning" @click="reviewResult(row, 3)">退回修改</el-button>
+            <el-button v-if="row.scheduleId && row.isPublished !== 1" link type="success" @click="publishSchedule(row)">发布本场</el-button>
+            <el-button v-if="row.isPublished !== 1" link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <el-pagination
         class="mt-20"
         v-model:current-page="queryParams.current"
@@ -73,141 +76,121 @@
       />
     </el-card>
 
-    <!-- 新增/编辑弹窗 -->
-    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" destroy-on-close>
-      <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="650px" destroy-on-close>
+      <el-form ref="formRef" :model="formData" :rules="rules" label-width="115px">
         <el-form-item label="赛事" prop="eventId">
-          <el-select v-model="formData.eventId" placeholder="请选择" filterable @change="onEventChange">
+          <el-select v-model="formData.eventId" placeholder="请选择赛事" filterable :disabled="!!editingId" @change="onEventChange">
             <el-option v-for="item in eventOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="运动项目" prop="sportItemId">
-          <el-select v-model="formData.sportItemId" placeholder="请选择" filterable @change="onSportItemChange">
+          <el-select v-model="formData.sportItemId" placeholder="请选择项目" filterable :disabled="!!editingId" @change="onSportItemChange">
             <el-option v-for="item in formSportItemOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="已审核报名" prop="registrationId">
-          <el-select v-model="formData.registrationId" placeholder="请选择报名记录" filterable>
-            <el-option v-for="item in participantOptions" :key="item.id" :label="`${item.realName || item.username}（${item.studentNo || '无学号'}）`" :value="item.id" />
+        <el-form-item label="比赛场次" prop="scheduleId">
+          <el-select v-model="formData.scheduleId" placeholder="请选择赛程" clearable filterable>
+            <el-option v-for="item in formScheduleOptions" :key="item.id" :label="`${item.matchDate} ${item.startTime} · ${roundName(item.roundType)}`" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="成绩" prop="score">
-          <el-input-number v-model="formData.score" :precision="2" :step="0.1" />
+        <el-form-item label="参赛主体">
+          <el-radio-group v-model="formData.entryType" :disabled="!!editingId" @change="loadParticipants">
+            <el-radio value="INDIVIDUAL">个人</el-radio>
+            <el-radio value="RELAY">接力队伍</el-radio>
+          </el-radio-group>
         </el-form-item>
-        <el-form-item label="成绩文本" prop="scoreText">
-          <el-input v-model="formData.scoreText" placeholder="如：10.25秒、5.60米" style="width: 180px" />
+        <el-form-item v-if="formData.entryType === 'INDIVIDUAL'" label="已通过报名" prop="registrationId">
+          <el-select v-model="formData.registrationId" placeholder="选择参赛者" filterable>
+            <el-option v-for="item in participantOptions" :key="item.id" :label="`${item.realName || item.username}（${item.studentNo || '无学号'} · ${item.college || '未填写学院'}）`" :value="item.id" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="名次" prop="ranking">
-          <el-input-number v-model="formData.ranking" :min="1" :max="100" />
+        <el-form-item v-else label="已审核接力队伍" prop="relayTeamId">
+          <el-select v-model="formData.relayTeamId" placeholder="选择接力队伍" filterable>
+            <el-option v-for="item in relayTeamOptions" :key="item.id" :label="`${item.teamName}（${item.college || '未填写学院'}）`" :value="item.id" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="积分" prop="points">
-          <el-input-number v-model="formData.points" :min="0" :max="100" />
+        <el-form-item label="成绩状态" prop="resultStatus">
+          <el-select v-model="formData.resultStatus" @change="onResultStatusChange">
+            <el-option label="有效成绩" value="VALID" />
+            <el-option label="未出赛 DNS" value="DNS" />
+            <el-option label="未完成 DNF" value="DNF" />
+            <el-option label="取消资格 DQ" value="DQ" />
+            <el-option label="弃权 WD" value="WD" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" />
+        <el-form-item v-if="formData.resultStatus === 'VALID'" label="成绩数值" prop="score">
+          <el-input-number v-model="formData.score" :precision="3" :step="0.01" :min="0" />
+        </el-form-item>
+        <el-form-item v-if="formData.resultStatus === 'VALID'" label="成绩文本">
+          <el-input v-model="formData.scoreText" placeholder="如：10.25秒、5.60米" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="成绩说明或异常情况" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 导入弹窗 -->
-    <el-dialog v-model="importDialogVisible" title="导入成绩" width="500px">
-      <el-form label-width="100px">
-        <el-form-item label="赛事">
-          <el-select v-model="importEventId" placeholder="请选择" filterable>
-            <el-option v-for="item in eventOptions" :key="item.id" :label="item.name" :value="item.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="选择文件">
-          <el-upload
-            ref="uploadRef"
-            :auto-upload="false"
-            :limit="1"
-            accept=".xlsx,.xls"
-            :on-change="handleFileChange"
-          >
-            <el-button type="primary">选择Excel文件</el-button>
-            <template #tip>
-              <div class="el-upload__tip">只能上传 xlsx/xls 文件</div>
-            </template>
-          </el-upload>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" link @click="downloadTemplate">下载导入模板</el-button>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="importDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="importLoading" @click="submitImport">确定导入</el-button>
+        <el-button type="primary" :loading="submitLoading" @click="handleSubmit">保存为待复核</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, FormInstance, FormRules, UploadInstance } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { get, post, put, del } from '@/utils/request'
 
+const router = useRouter()
 const loading = ref(false)
+const submitLoading = ref(false)
 const tableData = ref<any[]>([])
 const total = ref(0)
 const eventOptions = ref<any[]>([])
 const sportItemOptions = ref<any[]>([])
-
-const queryParams = reactive({
-  current: 1,
-  size: 10,
-  eventId: null as number | null,
-  sportItemId: null as number | null
-})
-
+const formSportItemOptions = ref<any[]>([])
+const formScheduleOptions = ref<any[]>([])
+const participantOptions = ref<any[]>([])
+const relayTeamOptions = ref<any[]>([])
+const queryParams = reactive({ current: 1, size: 10, eventId: null as number | null, sportItemId: null as number | null })
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
-const submitLoading = ref(false)
 const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
-
-const formSportItemOptions = ref<any[]>([])
-const participantOptions = ref<any[]>([])
-
 const formData = reactive({
   eventId: null as number | null,
   sportItemId: null as number | null,
+  scheduleId: null as number | null,
+  entryType: 'INDIVIDUAL',
   registrationId: null as number | null,
-  score: 0,
+  relayTeamId: null as number | null,
+  resultStatus: 'VALID',
+  score: null as number | null,
   scoreText: '',
-  ranking: 1,
-  points: 0,
   remark: ''
 })
-
 const rules: FormRules = {
   eventId: [{ required: true, message: '请选择赛事', trigger: 'change' }],
-  sportItemId: [{ required: true, message: '请选择运动项目', trigger: 'change' }],
-  registrationId: [{ required: true, message: '请选择已审核通过的报名记录', trigger: 'change' }],
-  score: [{ required: true, message: '请输入成绩', trigger: 'blur' }]
+  sportItemId: [{ required: true, message: '请选择项目', trigger: 'change' }],
+  scheduleId: [{ required: true, message: '请选择比赛场次', trigger: 'change' }],
+  score: [{ validator: (_rule: any, value: number | null, callback: (error?: Error) => void) => {
+    if (formData.resultStatus === 'VALID' && (value === null || value === undefined || value < 0)) {
+      callback(new Error('有效成绩必须填写非负数值'))
+      return
+    }
+    callback()
+  }, trigger: 'blur' }]
 }
 
-const importDialogVisible = ref(false)
-const importLoading = ref(false)
-const importEventId = ref<number | null>(null)
-const uploadRef = ref<UploadInstance>()
-const importFile = ref<File | null>(null)
-
-onMounted(() => {
-  loadEventOptions()
-  loadData()
+onMounted(async () => {
+  await loadEventOptions()
+  await loadData()
 })
 
 async function loadEventOptions() {
-  const res = await get('/events', { size: 100 })
-  if (res.code === 200) {
-    eventOptions.value = res.data.records || []
-  }
+  const res = await get('/events', { current: 1, size: 100 })
+  if (res.code === 200) eventOptions.value = res.data.records || []
 }
 
 async function loadData() {
@@ -215,11 +198,20 @@ async function loadData() {
   try {
     const res = await get('/results', queryParams)
     if (res.code === 200) {
-      tableData.value = res.data.records
-      total.value = res.data.total
+      tableData.value = res.data.records || []
+      total.value = res.data.total || 0
     }
   } finally {
     loading.value = false
+  }
+}
+
+async function onQueryEventChange(eventId: number | null) {
+  queryParams.sportItemId = null
+  sportItemOptions.value = []
+  if (eventId) {
+    const res = await get('/sport-items', { current: 1, size: 100, eventId })
+    if (res.code === 200) sportItemOptions.value = res.data.records || []
   }
 }
 
@@ -227,85 +219,193 @@ function resetQuery() {
   queryParams.eventId = null
   queryParams.sportItemId = null
   queryParams.current = 1
+  sportItemOptions.value = []
   loadData()
 }
 
 function handleAdd() {
   editingId.value = null
-  dialogTitle.value = '录入成绩'
+  dialogTitle.value = '录入比赛成绩'
   Object.assign(formData, {
-    eventId: null, sportItemId: null, registrationId: null,
-    score: 0, scoreText: '', ranking: 1, points: 0, remark: ''
+    eventId: queryParams.eventId,
+    sportItemId: queryParams.sportItemId,
+    scheduleId: null,
+    entryType: 'INDIVIDUAL',
+    registrationId: null,
+    relayTeamId: null,
+    resultStatus: 'VALID',
+    score: null,
+    scoreText: '',
+    remark: ''
   })
   formSportItemOptions.value = []
+  formScheduleOptions.value = []
   participantOptions.value = []
+  relayTeamOptions.value = []
   dialogVisible.value = true
+  if (formData.eventId) onEventChange(formData.eventId)
+  if (formData.sportItemId) onSportItemChange(formData.sportItemId)
 }
 
 async function handleEdit(row: any) {
   editingId.value = row.id
-  dialogTitle.value = '编辑成绩'
-  Object.assign(formData, row)
+  dialogTitle.value = '编辑待复核成绩'
+  Object.assign(formData, {
+    eventId: row.eventId,
+    sportItemId: row.sportItemId,
+    scheduleId: row.scheduleId,
+    entryType: row.relayTeamId ? 'RELAY' : 'INDIVIDUAL',
+    registrationId: row.registrationId,
+    relayTeamId: row.relayTeamId,
+    resultStatus: row.resultStatus || 'VALID',
+    score: row.score,
+    scoreText: row.scoreText || '',
+    remark: row.remark || ''
+  })
   await onEventChange(row.eventId)
-  formData.sportItemId = row.sportItemId
   await onSportItemChange(row.sportItemId)
-  formData.registrationId = row.registrationId
+  formData.scheduleId = row.scheduleId
+  if (row.relayTeamId) formData.relayTeamId = row.relayTeamId
+  else formData.registrationId = row.registrationId
   dialogVisible.value = true
 }
 
-async function onEventChange(eventId: number) {
+async function onEventChange(eventId: number | null) {
   formData.sportItemId = null
+  formData.scheduleId = null
   formData.registrationId = null
+  formData.relayTeamId = null
+  formSportItemOptions.value = []
+  formScheduleOptions.value = []
+  if (!eventId) return
+  const [itemsRes, schedulesRes] = await Promise.all([
+    get('/sport-items', { current: 1, size: 100, eventId }),
+    get('/schedules', { current: 1, size: 100, eventId })
+  ])
+  if (itemsRes.code === 200) formSportItemOptions.value = itemsRes.data.records || []
+  if (schedulesRes.code === 200) formScheduleOptions.value = schedulesRes.data.records || []
+  if (editingId.value) formData.sportItemId = formData.sportItemId
+}
+
+async function onSportItemChange(sportItemId: number | null) {
+  formData.scheduleId = null
+  formData.registrationId = null
+  formData.relayTeamId = null
   participantOptions.value = []
-  if (eventId) {
-    const res = await get('/sport-items', { eventId, size: 100 })
-    if (res.code === 200) {
-      formSportItemOptions.value = res.data.records || []
-    }
+  relayTeamOptions.value = []
+  if (!sportItemId) {
+    formScheduleOptions.value = []
+    return
+  }
+  formScheduleOptions.value = formScheduleOptions.value.filter(s => s.sportItemId === sportItemId)
+  const selected = formSportItemOptions.value.find(item => item.id === sportItemId)
+  if (selected?.isRelay === 1) formData.entryType = 'RELAY'
+  else formData.entryType = 'INDIVIDUAL'
+  await loadParticipants()
+}
+
+async function loadParticipants() {
+  formData.registrationId = null
+  formData.relayTeamId = null
+  if (!formData.eventId || !formData.sportItemId) return
+  if (formData.entryType === 'RELAY') {
+    const res = await get('/relay-teams', {
+      current: 1, size: 100, eventId: formData.eventId, sportItemId: formData.sportItemId, status: 2
+    })
+    if (res.code === 200) relayTeamOptions.value = res.data.records || []
   } else {
-    formSportItemOptions.value = []
+    const res = await get('/registrations', {
+      current: 1, size: 100, eventId: formData.eventId, sportItemId: formData.sportItemId, status: 'APPROVED'
+    })
+    if (res.code === 200) participantOptions.value = res.data.records || []
   }
 }
 
-async function onSportItemChange(sportItemId: number) {
-  formData.registrationId = null
-  if (sportItemId) {
-    // 获取该项目已通过审核的报名人员
-    const res = await get('/registrations', { eventId: formData.eventId, sportItemId, status: 'APPROVED', size: 100 })
-    if (res.code === 200) {
-      participantOptions.value = res.data.records || []
-    }
-  } else {
-    participantOptions.value = []
+function onResultStatusChange(status: string) {
+  if (status !== 'VALID') {
+    formData.score = null
+    formData.scoreText = status
+  } else if (formData.scoreText === 'DNS' || formData.scoreText === 'DNF' || formData.scoreText === 'DQ' || formData.scoreText === 'WD') {
+    formData.scoreText = ''
   }
 }
 
 async function handleSubmit() {
   if (!formRef.value) return
-  await formRef.value.validate(async (valid: boolean) => {
+  if (formData.entryType === 'INDIVIDUAL' && !formData.registrationId) {
+    ElMessage.warning('请选择已通过审核的个人报名记录')
+    return
+  }
+  if (formData.entryType === 'RELAY' && !formData.relayTeamId) {
+    ElMessage.warning('请选择已审核通过的接力队伍')
+    return
+  }
+  await formRef.value.validate(async valid => {
     if (!valid) return
     submitLoading.value = true
     try {
+      const payload: any = {
+        eventId: formData.eventId,
+        sportItemId: formData.sportItemId,
+        scheduleId: formData.scheduleId,
+        registrationId: formData.entryType === 'INDIVIDUAL' ? formData.registrationId : null,
+        relayTeamId: formData.entryType === 'RELAY' ? formData.relayTeamId : null,
+        resultStatus: formData.resultStatus,
+        score: formData.resultStatus === 'VALID' ? formData.score : null,
+        scoreText: formData.scoreText,
+        remark: formData.remark
+      }
       if (editingId.value) {
-        await put(`/results/${editingId.value}`, formData)
-        ElMessage.success('更新成功')
+        await put(`/results/${editingId.value}`, payload)
+        ElMessage.success('成绩已保存为待复核状态')
       } else {
-        await post('/results', formData)
-        ElMessage.success('录入成功')
+        await post('/results', payload)
+        ElMessage.success('成绩已录入，等待复核')
       }
       dialogVisible.value = false
-      loadData()
+      await loadData()
     } finally {
       submitLoading.value = false
     }
   })
 }
 
+async function reviewResult(row: any, status: number) {
+  let remark = ''
+  if (status === 3) {
+    try {
+      const result = await ElMessageBox.prompt('请填写退回修改原因', '退回成绩', {
+        inputPattern: /\S+/,
+        inputErrorMessage: '退回原因不能为空'
+      })
+      remark = result.value
+    } catch {
+      return
+    }
+  } else {
+    await ElMessageBox.confirm('确认复核通过该条成绩？', '成绩复核', { type: 'warning' })
+  }
+  await post(`/results/${row.id}/review`, { status, remark })
+  ElMessage.success(status === 2 ? '复核通过' : '已退回修改')
+  await loadData()
+}
+
+async function publishSchedule(row: any) {
+  await ElMessageBox.confirm(
+    `该操作将正式发布赛程ID ${row.scheduleId} 的全部成绩。必须确保所有参赛者均已录入并复核通过。确认发布？`,
+    '正式发布成绩',
+    { type: 'warning', confirmButtonText: '确认发布' }
+  )
+  const res = await post(`/results/schedules/${row.scheduleId}/publish`)
+  ElMessage.success(res.message || '赛程成绩已发布')
+  await loadData()
+}
+
 async function handleDelete(row: any) {
-  await ElMessageBox.confirm('确定要删除该成绩记录吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确定删除该条未发布成绩？', '删除成绩', { type: 'warning' })
   await del(`/results/${row.id}`)
-  ElMessage.success('删除成功')
-  loadData()
+  ElMessage.success('成绩记录已删除')
+  await loadData()
 }
 
 async function handleExport() {
@@ -313,45 +413,49 @@ async function handleExport() {
     ElMessage.warning('请先选择赛事')
     return
   }
-  window.open(`/results/export?eventId=${queryParams.eventId}`, '_blank')
+  const res = await get('/reports/results.csv', { eventId: queryParams.eventId })
+  downloadCsv(res.data, `正式成绩-${queryParams.eventId}.csv`)
 }
 
-function handleImport() {
-  importEventId.value = null
-  importFile.value = null
-  importDialogVisible.value = true
+function downloadCsv(content: string, filename: string) {
+  const blob = new Blob([content || ''], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
-function handleFileChange(file: any) {
-  importFile.value = file.raw
+function roundName(type: string) {
+  const map: Record<string, string> = { PRELIMINARY: '预赛', SEMIFINAL: '半决赛', FINAL: '决赛', FIELD_FINAL: '田赛决赛' }
+  return map[type] || type || '决赛'
 }
-
-async function downloadTemplate() {
-  window.open('/results/template', '_blank')
+function resultStatusName(status: string) {
+  const map: Record<string, string> = { VALID: '有效', DNS: '未出赛', DNF: '未完成', DQ: '取消资格', WD: '弃权' }
+  return map[status] || status || '待录入'
 }
-
-async function submitImport() {
-  if (!importEventId.value) {
-    ElMessage.warning('请选择赛事')
-    return
+function resultType(status: string): 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
+    VALID: 'success', DNS: 'warning', DNF: 'warning', DQ: 'danger', WD: 'info'
   }
-  if (!importFile.value) {
-    ElMessage.warning('请选择文件')
-    return
-  }
-  
-  importLoading.value = true
-  try {
-    const formData = new FormData()
-    formData.append('file', importFile.value)
-    formData.append('eventId', String(importEventId.value))
-    
-    await post('/results/import', formData)
-    ElMessage.success('导入成功')
-    importDialogVisible.value = false
-    loadData()
-  } finally {
-    importLoading.value = false
-  }
+  return map[status] || 'info'
+}
+function reviewStatusName(status: number) {
+  const map: Record<number, string> = { 1: '待复核', 2: '已复核', 3: '已退回' }
+  return map[status] || '待复核'
+}
+function reviewType(status: number): 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'danger'> = { 1: 'warning', 2: 'success', 3: 'danger' }
+  return map[status] || 'info'
 }
 </script>
+
+<style scoped>
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+</style>
