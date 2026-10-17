@@ -3,7 +3,7 @@
     <el-card shadow="never" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <span>{{ isStaff ? '接力队伍审核' : '接力组队报名' }}</span>
+          <span>{{ isStaff ? '接力/集体项目队伍审核' : '接力/集体项目组队报名' }}</span>
           <el-button v-if="!isStaff" type="primary" @click="openCreate">创建接力队伍</el-button>
         </div>
       </template>
@@ -29,7 +29,7 @@
       <el-table :data="teams" border stripe>
         <el-table-column prop="teamName" label="队伍名称" min-width="150" />
         <el-table-column prop="eventName" label="赛事" min-width="160" />
-        <el-table-column prop="sportItemName" label="接力项目" min-width="130" />
+        <el-table-column prop="sportItemName" label="参赛项目" min-width="160" />
         <el-table-column prop="college" label="学院" min-width="140" />
         <el-table-column prop="creatorName" label="队长" width="100" />
         <el-table-column label="队员名单" min-width="250">
@@ -60,14 +60,14 @@
       <el-empty v-if="!loading && teams.length === 0" description="暂无接力队伍记录" />
     </el-card>
 
-    <el-dialog v-model="dialogVisible" :title="editingTeamId ? '调整接力队员' : '创建接力队伍'" width="620px" destroy-on-close>
+    <el-dialog v-model="dialogVisible" :title="editingTeamId ? '调整队伍成员' : (selectedItem?.isRelay === 1 ? '创建接力队伍' : '创建集体项目队伍')" width="620px" destroy-on-close>
       <el-form ref="formRef" :model="formData" :rules="rules" label-width="110px">
         <el-form-item label="赛事" prop="eventId">
           <el-select v-model="formData.eventId" placeholder="请选择赛事" filterable :disabled="!!editingTeamId" @change="onEventChange">
             <el-option v-for="event in eventOptions" :key="event.id" :label="event.name" :value="event.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="接力项目" prop="sportItemId">
+        <el-form-item label="参赛项目" prop="sportItemId">
           <el-select v-model="formData.sportItemId" placeholder="请选择接力项目" filterable :disabled="!!editingTeamId" @change="onItemChange">
             <el-option v-for="item in relayItems" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
@@ -77,7 +77,7 @@
         </el-form-item>
         <el-form-item label="队员要求">
           <span v-if="selectedItem">
-            {{ selectedItem.relayMemberCount || 4 }} 名正式队员，最多 {{ selectedItem.relayReserveCount || 0 }} 名替补。队长自动计入正式队员。
+            {{ requiredMemberCount }} 名队伍成员，最多 {{ reserveMemberCount }} 名替补。当前账号自动加入队伍；混合接力按女、男、女、男顺序自动安排正式棒次。
           </span>
           <span v-else>请先选择接力项目</span>
         </el-form-item>
@@ -100,7 +100,7 @@
               :value="member.userId"
             />
           </el-select>
-          <div class="form-tip">系统会自动加入当前账号作为队长。请只选择其他队员；所有队员必须来自同一学院。</div>
+          <div class="form-tip">系统会自动加入当前账号作为队长。请只选择其他队员；队员必须来自同一学院，乙组队伍还须属于同一年级/专业班级。</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -120,7 +120,7 @@
         <el-descriptions-item label="队员">
           <el-timeline>
             <el-timeline-item v-for="member in currentTeam.members || []" :key="member.userId">
-              {{ member.reserve ? '替补' : `第 ${member.legOrder} 棒` }}：{{ member.realName || member.username }}
+              {{ member.reserve ? '替补' : (currentTeam.isRelay === 1 ? `第 ${member.legOrder} 棒` : `队员 ${member.legOrder}`) }}：{{ member.realName || member.username }}
               （{{ member.studentNo }}，{{ member.className || '未填写班级' }}）
             </el-timeline-item>
           </el-timeline>
@@ -166,8 +166,8 @@ const rules: FormRules = {
   sportItemId: [{ required: true, message: '请选择接力项目', trigger: 'change' }],
   teamName: [{ required: true, message: '请输入队伍名称', trigger: 'blur' }],
   memberUserIds: [{ validator: (_rule: any, value: number[], callback: (error?: Error) => void) => {
-    const required = Number(selectedItem.value?.relayMemberCount || 4) - 1
-    const max = required + Number(selectedItem.value?.relayReserveCount || 0)
+    const required = requiredMemberCount.value - 1
+    const max = required + reserveMemberCount.value
     if (!editingTeamId.value && (!value || value.length < required || value.length > max)) {
       callback(new Error(`请为队长选择 ${required} 至 ${max} 名队友`))
       return
@@ -176,9 +176,21 @@ const rules: FormRules = {
   }, trigger: 'change' }]
 }
 const selectedItem = computed(() => relayItems.value.find(item => item.id === formData.sportItemId))
+const requiredMemberCount = computed(() => {
+  if (!selectedItem.value) return 4
+  return Number(selectedItem.value.isRelay === 1
+    ? selectedItem.value.relayMemberCount || 4
+    : selectedItem.value.teamMemberCount || 0)
+})
+const reserveMemberCount = computed(() => {
+  if (!selectedItem.value) return 0
+  return Number(selectedItem.value.isRelay === 1
+    ? selectedItem.value.relayReserveCount || 0
+    : selectedItem.value.teamReserveCount || 0)
+})
 const memberSelectionLimit = computed(() => {
   if (!selectedItem.value) return 0
-  return Math.max(0, Number(selectedItem.value.relayMemberCount || 4) - 1 + Number(selectedItem.value.relayReserveCount || 0))
+  return Math.max(0, requiredMemberCount.value - 1 + reserveMemberCount.value)
 })
 
 onMounted(async () => {
@@ -242,7 +254,7 @@ async function onEventChange(eventId: number) {
   if (!eventId) return
   const res = await get('/sport-items', { eventId, current: 1, size: 100 })
   if (res.code === 200) {
-    relayItems.value = (res.data.records || []).filter((item: any) => item.isRelay === 1 && item.status === 1)
+    relayItems.value = (res.data.records || []).filter((item: any) => (item.isRelay === 1 || item.isTeamEvent === 1) && item.status === 1)
     if (relayItems.value.length === 1) {
       formData.sportItemId = relayItems.value[0].id
       loadEligibleMembers('', true)
