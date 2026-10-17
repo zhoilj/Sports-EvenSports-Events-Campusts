@@ -114,6 +114,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (roundType != null && !java.util.Set.of("PRELIMINARY", "SEMIFINAL", "FINAL", "FIELD_FINAL").contains(roundType)) {
             throw new BusinessException("比赛轮次类型无效");
         }
+        validateRoundConfiguration(schedule);
         String roundPolicy = item.getRoundPolicy() == null ? "FLEXIBLE" : item.getRoundPolicy();
         if ("FINAL_ONLY".equalsIgnoreCase(roundPolicy)
                 && !java.util.Set.of("FINAL", "FIELD_FINAL").contains(roundType)) {
@@ -157,6 +158,18 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         }
     }
 
+    private void validateRoundConfiguration(Schedule schedule) {
+        String roundType = schedule.getRoundType() == null ? "FINAL" : schedule.getRoundType();
+        if (java.util.Set.of("PRELIMINARY", "SEMIFINAL").contains(roundType)
+                && (schedule.getQualificationCount() == null || schedule.getQualificationCount() < 1)) {
+            throw new BusinessException("预赛/半决赛必须按秩序册配置晋级人数后才能保存或开始");
+        }
+        if (java.util.Set.of("FINAL", "FIELD_FINAL").contains(roundType)
+                && (schedule.getAwardCount() == null || schedule.getAwardCount() < 1)) {
+            throw new BusinessException("决赛/田赛决赛必须按秩序册配置录取名次后才能保存或开始");
+        }
+    }
+
     private java.time.LocalTime effectiveEnd(Schedule schedule, SportItem item) {
         if (schedule.getEndTime() != null) return schedule.getEndTime();
         int minutes = 30;
@@ -195,6 +208,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (!STATUS_PENDING.equals(schedule.getStatus())) {
             throw new BusinessException(ResultCode.BAD_REQUEST);
         }
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        if (item == null) throw new BusinessException("比赛项目不存在");
+        validateRoundConfiguration(schedule);
         schedule.setStatus(STATUS_ONGOING);
         this.updateById(schedule);
     }
