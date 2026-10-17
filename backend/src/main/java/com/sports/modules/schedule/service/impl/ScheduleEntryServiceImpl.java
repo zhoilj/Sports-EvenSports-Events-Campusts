@@ -74,6 +74,12 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
     }
 
     @Override
+    public boolean hasEntries(Long scheduleId) {
+        return this.count(new LambdaQueryWrapper<ScheduleEntry>()
+                .eq(ScheduleEntry::getScheduleId, scheduleId)) > 0;
+    }
+
+    @Override
     public List<ScheduleEntryVO> listMyEntries() {
         Long userId = SecurityUtils.getUserId();
         List<Long> registrationIds = registrationService.list(new LambdaQueryWrapper<Registration>()
