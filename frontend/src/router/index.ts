@@ -30,7 +30,7 @@ const routes: RouteRecordRaw[] = [
         path: 'events',
         name: 'Events',
         component: () => import('@/views/event/list.vue'),
-        meta: { title: '赛事管理', icon: 'Trophy', roles: ['ADMIN', 'TEACHER'], group: '赛前准备' }
+        meta: { title: '赛事管理', icon: 'Trophy', roles: ['ADMIN', 'TEACHER'], group: '赛前筹备' }
       },
       {
         path: 'events/:id',
@@ -43,14 +43,14 @@ const routes: RouteRecordRaw[] = [
         path: 'sport-items',
         name: 'SportItems',
         component: () => import('@/views/sportitem/list.vue'),
-        meta: { title: '运动项目', icon: 'Football', roles: ['ADMIN', 'TEACHER'], group: '赛前准备' }
+        meta: { title: '运动项目', icon: 'Football', roles: ['ADMIN', 'TEACHER'], group: '赛前筹备' }
       },
       // 报名管理
       {
         path: 'registrations',
         name: 'Registrations',
         component: () => import('@/views/registration/list.vue'),
-        meta: { title: '报名管理', icon: 'Document', roles: ['ADMIN', 'TEACHER'], group: '赛前准备' }
+        meta: { title: '报名管理', icon: 'Document', roles: ['ADMIN', 'TEACHER'], group: '赛前筹备' }
       },
       {
         path: 'my-registrations',
@@ -62,7 +62,7 @@ const routes: RouteRecordRaw[] = [
         path: 'relay-teams',
         name: 'RelayTeams',
         component: () => import('@/views/registration/relay-teams.vue'),
-        meta: { title: '接力组队', icon: 'UserFilled', roles: ['ADMIN', 'TEACHER', 'STUDENT'], group: '赛前准备' }
+        meta: { title: '接力组队', icon: 'UserFilled', roles: ['ADMIN', 'TEACHER', 'STUDENT'], group: '赛前筹备' }
       },
       {
         path: 'my-schedule-entries',
@@ -75,20 +75,26 @@ const routes: RouteRecordRaw[] = [
         path: 'schedules',
         name: 'Schedules',
         component: () => import('@/views/schedule/list.vue'),
-        meta: { title: '赛程安排', icon: 'Calendar', group: '赛程与检录' }
+        meta: { title: '赛程安排', icon: 'Calendar', group: '赛中执行' }
+      },
+      {
+        path: 'orderbook',
+        name: 'OrderBook',
+        component: () => import('@/views/orderbook/index.vue'),
+        meta: { title: '秩序册生成', icon: 'Document', roles: ['ADMIN', 'TEACHER'], group: '赛前筹备' }
       },
       {
         path: 'competition-operations',
         name: 'CompetitionOperations',
         component: () => import('@/views/competition/operations.vue'),
-        meta: { title: '竞赛执行与检录', icon: 'Finished', roles: ['ADMIN', 'TEACHER'], group: '赛程与检录' }
+        meta: { title: '竞赛执行与检录', icon: 'Finished', roles: ['ADMIN', 'TEACHER'], group: '赛中执行' }
       },
       // 成绩管理
       {
         path: 'results',
         name: 'Results',
         component: () => import('@/views/result/list.vue'),
-        meta: { title: '成绩管理', icon: 'Medal', roles: ['ADMIN', 'TEACHER'], group: '成绩管理' }
+        meta: { title: '成绩管理', icon: 'Medal', roles: ['ADMIN', 'TEACHER'], group: '成绩与统计' }
       },
       {
         path: 'my-results',
@@ -115,13 +121,13 @@ const routes: RouteRecordRaw[] = [
         path: 'statistics',
         name: 'Statistics',
         component: () => import('@/views/statistics/index.vue'),
-        meta: { title: '统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'], group: '统计报表' }
+        meta: { title: '统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'], group: '成绩与统计' }
       },
       {
         path: 'standings',
         name: 'Standings',
         component: () => import('@/views/statistics/standings.vue'),
-        meta: { title: '学院积分与奖牌榜', icon: 'Medal', roles: ['ADMIN', 'TEACHER'], group: '统计报表' }
+        meta: { title: '学院积分与奖牌榜', icon: 'Medal', roles: ['ADMIN', 'TEACHER'], group: '成绩与统计' }
       },
       // 个人中心
       {
