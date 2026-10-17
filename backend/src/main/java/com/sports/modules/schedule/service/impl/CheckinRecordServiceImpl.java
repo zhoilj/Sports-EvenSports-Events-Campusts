@@ -73,6 +73,9 @@ public class CheckinRecordServiceImpl extends ServiceImpl<CheckinRecordMapper, C
         if (Set.of("ABSENT", "WITHDRAWN", "DQ").contains(oldStatus) && !oldStatus.equals(status)) {
             throw new BusinessException("缺席、弃权或取消资格属于终止状态，不能直接改回其他状态");
         }
+        if ("CHECKED_IN".equals(oldStatus) && "ABSENT".equals(status)) {
+            throw new BusinessException("已完成检录的参赛者不能再标记为缺席，可登记弃权或取消资格");
+        }
         if ("PENDING".equals(oldStatus) && "WITHDRAWN".equals(status)) {
             // Allowed when an athlete withdraws before checking in.
         }
