@@ -77,7 +77,7 @@
         </el-form-item>
         <el-form-item label="队员要求">
           <span v-if="selectedItem">
-            {{ requiredMemberCount }} 名队伍成员，最多 {{ reserveMemberCount }} 名替补。当前账号自动加入队伍；混合接力按女、男、女、男顺序自动安排正式棒次。
+            {{ requiredMemberCount }} 名队伍成员，最多 {{ reserveMemberCount }} 名替补。当前账号自动加入队伍；混合接力按女、男、女、男顺序自动安排正式棒次。{{ rosterRuleHint }}
           </span>
           <span v-else>请先选择接力项目</span>
         </el-form-item>
@@ -191,6 +191,20 @@ const reserveMemberCount = computed(() => {
 const memberSelectionLimit = computed(() => {
   if (!selectedItem.value) return 0
   return Math.max(0, requiredMemberCount.value - 1 + reserveMemberCount.value)
+})
+const rosterRuleHint = computed(() => {
+  const rule = selectedItem.value?.teamRosterRule
+  const hints: Record<string, string> = {
+    MIXED_5M5F: '正式队员须5男5女。',
+    MIXED_10M10F: '正式队员须10男10女。',
+    MIXED_15M15F: '正式队员须15男15女。',
+    MIXED_3M3F: '正式队员须3男3女。',
+    MIXED_2M2F_MIN: '正式队员共5人，至少2男2女。',
+    PAIRS_1M1F: '请按组合顺序选择；每连续2名视为一组，须1男1女。',
+    MIXED_MIN_6F: '请按板鞋小组顺序选择；每连续3名视为一组，每组至少1名女生。',
+    CUSTOM: '该项目规程存在需要人工确认的队员构成要求，请先向竞赛委员会核实。'
+  }
+  return rule ? ` ${hints[rule] || ''}` : ''
 })
 
 onMounted(async () => {
