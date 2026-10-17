@@ -107,7 +107,7 @@ public class SportItemController {
                     "袋鼠跳", "滚铁环", "企鹅漫步", "协同大转盘", "竞步跑");
             boolean mixedRelay = name.contains("混合接力") || name.contains("混合");
             item.setDivision(name.contains("甲组") ? "A" : name.contains("乙组") ? "B"
-                    : name.contains("教工组") ? "STAFF" : groupEvent ? "A" : "OPEN");
+                    : name.contains("教工组") ? "STAFF" : "OPEN");
             boolean teamEvent = Integer.valueOf(1).equals(item.getIsRelay()) || groupEvent;
             item.setIsTeamEvent(teamEvent ? 1 : 0);
             if (teamEvent && !Integer.valueOf(1).equals(item.getIsRelay()) && item.getTeamMemberCount() == null) {
