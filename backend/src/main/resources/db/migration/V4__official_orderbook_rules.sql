@@ -62,7 +62,8 @@ WHERE gender_category = 'OPEN';
 
 UPDATE sport_item
 SET round_policy = CASE
-  WHEN item_name LIKE '%混合接力%' OR item_type = 'FIELD' THEN 'FINAL_ONLY'
+  WHEN item_name LIKE '%混合接力%' OR item_type = 'FIELD'
+    OR item_name LIKE '%竞步跑%' OR item_name LIKE '%趣味%' OR item_name LIKE '%集体%' OR item_name LIKE '%民体%' THEN 'FINAL_ONLY'
   WHEN item_name LIKE '%100米%' OR item_name LIKE '%200米%'
     OR item_name LIKE '%4×100%' OR item_name LIKE '%4x100%' OR item_name LIKE '%4X100%' THEN 'PRELIMINARY_FINAL'
   ELSE 'FINAL_ONLY'
