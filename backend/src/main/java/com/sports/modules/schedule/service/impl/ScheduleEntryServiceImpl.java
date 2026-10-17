@@ -307,6 +307,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             if (selected.size() >= qualifyCount) break;
             if (selectedKeys.add(resultKey(result))) selected.add(result);
         }
+        selected.sort(scoreOrder);
         if (selected.size() >= qualifyCount && selected.size() < eligible.size()) {
             BigDecimal cutoff = selected.get(selected.size() - 1).getScore();
             for (CompetitionResult result : eligible) {
@@ -316,6 +317,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
         }
         if (selected.isEmpty()) throw new BusinessException("没有符合条件的晋级选手");
+        selected.sort(scoreOrder);
 
         List<ScheduleEntry> candidates = new ArrayList<>();
         for (int i = 0; i < selected.size(); i++) {
