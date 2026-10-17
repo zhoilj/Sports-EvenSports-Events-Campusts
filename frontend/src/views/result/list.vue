@@ -50,12 +50,23 @@
           </template>
         </el-table-column>
         <el-table-column prop="points" label="积分" width="80" />
+        <el-table-column label="复核状态" width="110">
+          <template #default="{ row }">
+            <el-tag :type="getReviewType(row.reviewStatus)">{{ getReviewName(row.reviewStatus) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="发布状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isPublished === 1 ? 'success' : 'info'">{{ row.isPublished === 1 ? '已发布' : '未发布' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="recorderName" label="记录人" width="100" />
         <el-table-column prop="recordTime" label="记录时间" width="160" />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.isPublished !== 1" type="primary" link @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="isAdmin && row.isPublished !== 1" type="danger" link @click="handleDelete(row)">删除</el-button>
+            <span v-if="row.isPublished === 1" class="published-label">正式成绩</span>
           </template>
         </el-table-column>
       </el-table>
@@ -148,9 +159,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules, UploadInstance } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.userInfo?.role === 'ADMIN')
 
 const loading = ref(false)
 const tableData = ref<any[]>([])
@@ -313,7 +328,20 @@ async function handleExport() {
     ElMessage.warning('请先选择赛事')
     return
   }
-  window.open(`/results/export?eventId=${queryParams.eventId}`, '_blank')
+  const res = await get('/reports/results.csv', { eventId: queryParams.eventId })
+  if (res.code !== 200 || typeof res.data !== 'string') {
+    ElMessage.warning('未能获取正式成绩导出文件')
+    return
+  }
+  const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'official-results-' + queryParams.eventId + '.csv'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 function handleImport() {
@@ -353,5 +381,13 @@ async function submitImport() {
   } finally {
     importLoading.value = false
   }
+}
+
+function getReviewName(status: number | null) {
+  return ({ 1: '待复核', 2: '已通过', 3: '退回修改' } as Record<number, string>)[Number(status)] || '待复核'
+}
+
+function getReviewType(status: number | null): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  return ({ 1: 'info', 2: 'success', 3: 'warning' } as Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'>)[Number(status)] || 'info'
 }
 </script>
