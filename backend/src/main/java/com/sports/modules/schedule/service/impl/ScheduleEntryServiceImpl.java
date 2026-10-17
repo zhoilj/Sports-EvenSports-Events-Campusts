@@ -327,7 +327,12 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         if (this.count(new LambdaQueryWrapper<ScheduleEntry>().eq(ScheduleEntry::getScheduleId, target.getId())) > 0) {
             throw new BusinessException("目标赛程已有参赛名单，不能重复晋级");
         }
-        int qualifyCount = dto.getQualifyCount();
+        if (!java.util.Set.of("PRELIMINARY", "SEMIFINAL").contains(source.getRoundType())) {
+            throw new BusinessException("只有预赛或半决赛可以生成下一轮晋级名单");
+        }
+        Integer requestedQualifyCount = dto.getQualifyCount();
+        int qualifyCount = requestedQualifyCount != null ? requestedQualifyCount
+                : (source.getQualificationCount() == null ? 0 : source.getQualificationCount());
         int topPerGroup = dto.getTopPerGroup() == null ? 0 : dto.getTopPerGroup();
         int groupSize = dto.getGroupSize() == null ? 8 : dto.getGroupSize();
         if (qualifyCount < 1 || topPerGroup < 0 || groupSize < 1 || groupSize > 16) {
