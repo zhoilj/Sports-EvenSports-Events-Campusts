@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -129,8 +130,8 @@ class RegistrationMySqlIT {
 
         assertTrue(result.getResponse().getStatus() < 500,
                 "qualification failure should be handled as a business response: "
-                        + result.getResponse().getContentAsString());
-        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+                        + result.getResponse().getContentAsString(StandardCharsets.UTF_8));
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         assertFalse(response.path("data").canConvertToLong(),
                 "cross-college relay roster must not return a registration ID");
         assertEquals(0, jdbcTemplate.queryForObject(
@@ -198,9 +199,9 @@ class RegistrationMySqlIT {
                         .content(objectMapper.writeValueAsBytes(dto)))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         assertTrue(response.path("data").canConvertToLong(),
-                "registration API did not return an ID: " + result.getResponse().getContentAsString());
+                "registration API did not return an ID: " + result.getResponse().getContentAsString(StandardCharsets.UTF_8));
         return response.path("data").asLong();
     }
 
@@ -211,7 +212,7 @@ class RegistrationMySqlIT {
                         .header("Authorization", bearer(user)))
                 .andExpect(status().isOk())
                 .andReturn();
-        return objectMapper.readTree(result.getResponse().getContentAsString());
+        return objectMapper.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
     }
 
     private java.util.Optional<JsonNode> findRecord(JsonNode records, long id) {
