@@ -224,8 +224,8 @@ function goBack() {
   router.push('/events')
 }
 
-function getStatusType(status: string | number) {
-  const map: Record<string, string> = {
+function getStatusType(status: string | number): 'info' | 'primary' | 'success' | 'warning' {
+  const map: Record<string, 'info' | 'primary' | 'success' | 'warning'> = {
     '1': 'info',
     '2': 'primary',
     '3': 'success',
@@ -234,8 +234,8 @@ function getStatusType(status: string | number) {
   return map[String(status)] || 'info'
 }
 
-function getScheduleStatusType(status: string) {
-  const map: Record<string, string> = {
+function getScheduleStatusType(status: string): 'info' | 'primary' | 'success' | 'danger' {
+  const map: Record<string, 'info' | 'primary' | 'success' | 'danger'> = {
     PENDING: 'info',
     ONGOING: 'primary',
     COMPLETED: 'success',
