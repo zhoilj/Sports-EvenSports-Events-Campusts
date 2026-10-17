@@ -187,7 +187,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if ("FIELD".equals(leftType)) {
             return fieldAreaKey(left).equals(fieldAreaKey(right));
         }
-        return Objects.equals(left.getId(), right.getId());
+        return true; // Other events sharing the same configured location share one competition area.
     }
 
     private String fieldAreaKey(SportItem item) {
