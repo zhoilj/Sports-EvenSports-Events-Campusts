@@ -502,7 +502,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         if (entry.getRelayTeamId() != null) {
             return relayTeamMemberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
                             .eq(RelayTeamMember::getTeamId, entry.getRelayTeamId())
-                            .eq(RelayTeamMember::getIsReserve, 0))
+                            .eq(RelayTeamMember::getReserve, 0))
                     .stream().map(RelayTeamMember::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
         }
         return Set.of();
