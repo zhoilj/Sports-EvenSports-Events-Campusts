@@ -229,6 +229,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         validateRosterUsers(roster, team.getCollege(), item, team.getClassName(), requiredMemberCount(item));
         roster = arrangeMixedRelayRoster(roster, item);
         team.setClassName(resolveTeamClassName(roster, team.getClassName(), item));
+        this.updateById(team);
         ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
         memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
         saveRoster(id, roster, requiredMemberCount(item));
