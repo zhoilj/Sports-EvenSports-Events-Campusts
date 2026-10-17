@@ -104,6 +104,11 @@ public class EventVO {
     private Integer sportItemCount;
 
     /**
+     * 每名运动员可报名的项目数；0 表示不限制
+     */
+    private Integer maxProjectsPerAthlete;
+
+    /**
      * 创建时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
