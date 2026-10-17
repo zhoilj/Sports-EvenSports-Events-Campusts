@@ -228,7 +228,9 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         List<Long> roster = normalizeRoster(memberUserIds, team.getCreatorUserId(), item);
         validateRosterUsers(roster, team.getCollege(), item, team.getClassName(), requiredMemberCount(item));
         roster = arrangeMixedRelayRoster(roster, item);
-        team.setClassName(resolveTeamClassName(roster, team.getClassName(), item));
+        SysUser creator = sysUserService.getById(team.getCreatorUserId());
+        String fallbackClass = creator == null ? team.getClassName() : creator.getClassName();
+        team.setClassName(resolveTeamClassName(roster, fallbackClass, item));
         int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
                 ? 1 : item.getMaxTeamsPerCollege();
         boolean divisionB = "B".equalsIgnoreCase(item.getDivision())
