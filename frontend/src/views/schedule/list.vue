@@ -101,13 +101,13 @@
             <el-option label="田赛决赛" value="FIELD_FINAL" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="formData.roundType === 'PRELIMINARY'" label="总晋级人数" prop="qualificationCount">
+        <el-form-item v-if="['PRELIMINARY', 'SEMIFINAL'].includes(formData.roundType)" label="总晋级人数" prop="qualificationCount" required>
           <el-input-number v-model="formData.qualificationCount" :min="1" :max="128" />
           <span class="form-tip">例如：100米预赛8人晋级决赛</span>
         </el-form-item>
-        <el-form-item v-if="['FINAL', 'FIELD_FINAL'].includes(formData.roundType)" label="录取名次" prop="awardCount">
+        <el-form-item v-if="['FINAL', 'FIELD_FINAL'].includes(formData.roundType)" label="录取名次" prop="awardCount" required>
           <el-input-number v-model="formData.awardCount" :min="1" :max="128" />
-          <span class="form-tip">按秩序册逐项填写；不填写则按积分表配置名次</span>
+          <span class="form-tip">必须按秩序册逐项填写，不能留空</span>
         </el-form-item>
         <el-form-item label="分组" prop="groupNo">
           <el-input v-model="formData.groupNo" placeholder="如：A组、B组" />
