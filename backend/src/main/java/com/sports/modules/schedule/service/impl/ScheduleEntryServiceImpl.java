@@ -3,6 +3,8 @@ package com.sports.modules.schedule.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sports.common.exception.BusinessException;
+import com.sports.modules.event.entity.Event;
+import com.sports.modules.event.service.EventService;
 import com.sports.modules.registration.entity.Registration;
 import com.sports.modules.registration.entity.RelayTeam;
 import com.sports.modules.registration.entity.RelayTeamMember;
@@ -50,6 +52,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
     private static final int TRANSITION_BUFFER_SECONDS = 600;
 
     private final ScheduleService scheduleService;
+    private final EventService eventService;
     private final SportItemService sportItemService;
     private final RegistrationService registrationService;
     private final RelayTeamService relayTeamService;
@@ -150,7 +153,9 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
 
     @Override
     public List<ScheduleEntryVO> listEntryDetails(Long scheduleId) {
-        requireSchedule(scheduleId);
+        Schedule schedule = requireSchedule(scheduleId);
+        Event event = eventService.getById(schedule.getEventId());
+        SportItem scheduleItem = sportItemService.getById(schedule.getSportItemId());
         List<ScheduleEntry> entries = this.list(new LambdaQueryWrapper<ScheduleEntry>()
                 .eq(ScheduleEntry::getScheduleId, scheduleId)
                 .orderByAsc(ScheduleEntry::getGroupNo)
@@ -170,10 +175,21 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             vo.setLaneNo(entry.getLaneNo());
             vo.setStartOrder(entry.getStartOrder());
             vo.setQualificationStatus(entry.getQualificationStatus());
+            vo.setCheckinCode("CK" + String.format(java.util.Locale.ROOT, "%08d", entry.getId()));
+            vo.setEventName(event == null ? null : event.getName());
+            vo.setSportItemName(scheduleItem == null ? null : scheduleItem.getName());
+            vo.setScheduleName(schedule.getScheduleName());
+            vo.setMatchDate(schedule.getMatchDate());
+            vo.setStartTime(schedule.getStartTime());
+            vo.setLocation(schedule.getLocation());
 
             CheckinRecord checkin = checkinRecordMapper.selectOne(new LambdaQueryWrapper<CheckinRecord>()
                     .eq(CheckinRecord::getScheduleEntryId, entry.getId()));
-            vo.setCheckinStatus(checkin == null ? "PENDING" : checkin.getStatus());
+            vo.setCheckinStatus(checkin == null || checkin.getStatus() == null ? "PENDING" : checkin.getStatus());
+            if (checkin != null) {
+                vo.setCheckedAt(checkin.getCheckedAt());
+                vo.setCheckinRemark(checkin.getRemark());
+            }
 
             if (entry.getRegistrationId() != null) {
                 Registration registration = registrationService.getById(entry.getRegistrationId());
@@ -217,6 +233,57 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
             output.add(vo);
         }
+        return output;
+    }
+
+    @Override
+    public List<ScheduleEntryVO> listMyEntries(Long userId) {
+        if (userId == null) return List.of();
+
+        List<Long> registrationIds = registrationService.list(new LambdaQueryWrapper<Registration>()
+                        .eq(Registration::getUserId, userId)
+                        .eq(Registration::getStatus, 2))
+                .stream().map(Registration::getId).collect(Collectors.toList());
+
+        List<Long> memberTeamIds = relayTeamMemberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                        .eq(RelayTeamMember::getUserId, userId))
+                .stream().map(RelayTeamMember::getTeamId).distinct().collect(Collectors.toList());
+        List<Long> approvedTeamIds = memberTeamIds.isEmpty()
+                ? List.of()
+                : relayTeamService.list(new LambdaQueryWrapper<RelayTeam>()
+                                .in(RelayTeam::getId, memberTeamIds)
+                                .eq(RelayTeam::getStatus, 2))
+                        .stream().map(RelayTeam::getId).collect(Collectors.toList());
+
+        if (registrationIds.isEmpty() && approvedTeamIds.isEmpty()) return List.of();
+
+        LambdaQueryWrapper<ScheduleEntry> wrapper = new LambdaQueryWrapper<>();
+        wrapper.and(condition -> {
+            if (!registrationIds.isEmpty()) {
+                condition.in(ScheduleEntry::getRegistrationId, registrationIds);
+            }
+            if (!approvedTeamIds.isEmpty()) {
+                if (!registrationIds.isEmpty()) condition.or();
+                condition.in(ScheduleEntry::getRelayTeamId, approvedTeamIds);
+            }
+        }).orderByAsc(ScheduleEntry::getScheduleId).orderByAsc(ScheduleEntry::getStartOrder);
+
+        List<ScheduleEntry> mine = this.list(wrapper);
+        if (mine.isEmpty()) return List.of();
+
+        Map<Long, Set<Long>> idsBySchedule = mine.stream().collect(Collectors.groupingBy(
+                ScheduleEntry::getScheduleId,
+                Collectors.mapping(ScheduleEntry::getId, Collectors.toSet())));
+        List<ScheduleEntryVO> output = new ArrayList<>();
+        for (Map.Entry<Long, Set<Long>> group : idsBySchedule.entrySet()) {
+            for (ScheduleEntryVO entry : listEntryDetails(group.getKey())) {
+                if (group.getValue().contains(entry.getId())) output.add(entry);
+            }
+        }
+        output.sort(Comparator.comparing(ScheduleEntryVO::getMatchDate,
+                        Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(ScheduleEntryVO::getStartTime,
+                        Comparator.nullsLast(Comparator.naturalOrder())));
         return output;
     }
 
