@@ -30,14 +30,17 @@ public class SportItemServiceImpl extends ServiceImpl<SportItemMapper, SportItem
     }
 
     @Override
-    public IPage<SportItem> pageItems(Integer current, Integer size, Long eventId, String type, Integer status) {
+    public IPage<SportItem> pageItems(Integer current, Integer size, Long eventId, String type, Integer status, String competitionGroup) {
         Page<SportItem> page = new Page<>(current, size);
 
         LambdaQueryWrapper<SportItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, SportItem::getEventId, eventId)
                 .eq(StringUtils.hasText(type), SportItem::getType, type)
                 .eq(status != null, SportItem::getStatus, status)
-                .orderByDesc(SportItem::getCreateTime);
+                .eq(StringUtils.hasText(competitionGroup), SportItem::getCompetitionGroup, competitionGroup)
+                .orderByAsc(SportItem::getCompetitionGroup)
+                .orderByAsc(SportItem::getType)
+                .orderByAsc(SportItem::getName);
 
         return this.page(page, wrapper);
     }
