@@ -60,12 +60,15 @@ public class SportItemController {
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Long> create(@Valid @RequestBody SportItem sportItem) {
         // 设置默认值
-        if (sportItem.getStatus() == null) {
-            sportItem.setStatus(1);
-        }
-        if (sportItem.getCurrentParticipants() == null) {
-            sportItem.setCurrentParticipants(0);
-        }
+        if (sportItem.getStatus() == null) sportItem.setStatus(1);
+        if (sportItem.getCurrentParticipants() == null) sportItem.setCurrentParticipants(0);
+        if (sportItem.getDivision() == null) sportItem.setDivision("OPEN");
+        if (sportItem.getGenderCategory() == null) sportItem.setGenderCategory("OPEN");
+        if (sportItem.getRoundPolicy() == null) sportItem.setRoundPolicy("FLEXIBLE");
+        if (sportItem.getScoringMultiplier() == null) sportItem.setScoringMultiplier(
+                Integer.valueOf(1).equals(sportItem.getIsRelay()) ? 2 : 1);
+        if (sportItem.getParticipationPoints() == null) sportItem.setParticipationPoints(0);
+        if (sportItem.getRecordPoints() == null) sportItem.setRecordPoints(9);
         sportItemService.save(sportItem);
         return Result.success(sportItem.getId());
     }
