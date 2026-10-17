@@ -3,6 +3,7 @@ package com.sports.modules.result.controller;
 import com.sports.common.result.PageResult;
 import com.sports.common.result.Result;
 import com.sports.modules.result.entity.CompetitionResult;
+import com.sports.modules.result.entity.ResultAuditLog;
 import com.sports.modules.result.dto.ReviewResultDTO;
 import com.sports.modules.result.service.CompetitionResultService;
 import com.sports.modules.result.vo.CompetitionResultVO;
@@ -92,6 +93,13 @@ public class CompetitionResultController {
     public Result<Integer> publishScheduleResults(@PathVariable Long scheduleId) {
         int count = competitionResultService.publishScheduleResults(scheduleId);
         return Result.success("已正式发布 " + count + " 条成绩", count);
+    }
+
+    @Operation(summary = "查看成绩审计记录")
+    @GetMapping("/{id}/audit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<List<ResultAuditLog>> getAuditLogs(@PathVariable Long id) {
+        return Result.success(competitionResultService.getAuditLogs(id));
     }
 
     @Operation(summary = "删除成绩")
