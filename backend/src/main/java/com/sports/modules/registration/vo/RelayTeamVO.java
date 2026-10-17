@@ -13,6 +13,7 @@ public class RelayTeamVO {
     private String eventName;
     private Long sportItemId;
     private String sportItemName;
+    private String competitionGroup;
     private String teamName;
     private String college;
     private String className;
