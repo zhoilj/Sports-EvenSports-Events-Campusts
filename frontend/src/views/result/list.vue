@@ -42,6 +42,9 @@
         </el-table-column>
         <el-table-column prop="ranking" label="名次" width="75" />
         <el-table-column prop="points" label="积分" width="70" />
+        <el-table-column label="破纪录" width="90">
+          <template #default="{ row }">{{ row.isRecord === 1 ? '是' : '否' }}</template>
+        </el-table-column>
         <el-table-column label="复核状态" width="105">
           <template #default="{ row }">
             <el-tag :type="reviewType(row.reviewStatus)">{{ reviewStatusName(row.reviewStatus) }}</el-tag>
@@ -125,6 +128,10 @@
         <el-form-item v-if="formData.resultStatus === 'VALID'" label="成绩文本">
           <el-input v-model="formData.scoreText" placeholder="如：10.25秒、5.60米" />
         </el-form-item>
+        <el-form-item v-if="formData.resultStatus === 'VALID'" label="破纪录">
+          <el-switch v-model="formData.isRecord" :active-value="1" :inactive-value="0" />
+          <span class="form-tip">仅在裁判确认打破正式校运会纪录时勾选</span>
+        </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="成绩说明或异常情况" />
         </el-form-item>
@@ -186,6 +193,7 @@ const formData = reactive({
   registrationId: null as number | null,
   relayTeamId: null as number | null,
   resultStatus: 'VALID',
+  isRecord: 0,
   score: null as number | null,
   scoreText: '',
   remark: ''
@@ -256,6 +264,7 @@ async function handleAdd() {
     registrationId: null,
     relayTeamId: null,
     resultStatus: 'VALID',
+    isRecord: 0,
     score: null,
     scoreText: '',
     remark: ''
@@ -286,6 +295,7 @@ async function handleEdit(row: any) {
     registrationId: row.registrationId,
     relayTeamId: row.relayTeamId,
     resultStatus: row.resultStatus || 'VALID',
+    isRecord: row.isRecord === 1 ? 1 : 0,
     score: row.score,
     scoreText: row.scoreText || '',
     remark: row.remark || ''
@@ -383,6 +393,7 @@ async function handleSubmit() {
         registrationId: formData.entryType === 'INDIVIDUAL' ? formData.registrationId : null,
         relayTeamId: formData.entryType === 'RELAY' ? formData.relayTeamId : null,
         resultStatus: formData.resultStatus,
+        isRecord: formData.resultStatus === 'VALID' ? formData.isRecord : 0,
         score: formData.resultStatus === 'VALID' ? formData.score : null,
         scoreText: formData.scoreText,
         remark: formData.remark
