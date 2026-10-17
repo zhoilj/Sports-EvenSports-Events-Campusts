@@ -50,7 +50,7 @@
           <div class="subheading">由管理员配置。正式发布成绩时按名次自动计算积分；同名次选手使用相同名次对应的积分。</div>
         </div>
         <div class="rule-actions">
-          <el-button v-if="canEditRules" @click="applyOfficialRules">套用正式规程积分</el-button>
+          <el-button v-if="canEditRules" @click="applyOfficialRules">套用并保存正式积分</el-button>
           <el-button v-if="canEditRules" @click="addRule">添加名次</el-button>
           <el-button v-if="canEditRules" type="primary" :loading="savingRules" @click="saveRules" :disabled="!eventId">保存规则</el-button>
         </div>
@@ -134,12 +134,25 @@ async function loadAll() {
 }
 
 async function applyOfficialRules() {
-  await ElMessageBox.confirm('将把名次积分设置为第1至第8名依次9、7、6、5、4、3、2、1分。接力和集体项目的倍率及参与分需在项目管理中另行配置。确认套用？', '正式规程积分模板', { type: 'warning' })
-  rules.value = [9, 7, 6, 5, 4, 3, 2, 1].map((points, index) => ({
+  if (!eventId.value) {
+    ElMessage.warning('请先选择赛事')
+    return
+  }
+  await ElMessageBox.confirm('将直接保存第1至第8名依次9、7、6、5、4、3、2、1分的积分规则。接力/集体项目倍率、参与分和破纪录积分需在项目管理中另行核对。确认应用？', '正式规程积分模板', { type: 'warning' })
+  const officialRules = [9, 7, 6, 5, 4, 3, 2, 1].map((points, index) => ({
     placeNo: index + 1,
     points,
     ruleName: `第${index + 1}名`
   }))
+  savingRules.value = true
+  try {
+    await put(`/scoring-rules?eventId=${eventId.value}`, officialRules)
+    rules.value = officialRules
+    ElMessage.success('正式名次积分规则已保存')
+    await loadAll()
+  } finally {
+    savingRules.value = false
+  }
 }
 
 function addRule() {
