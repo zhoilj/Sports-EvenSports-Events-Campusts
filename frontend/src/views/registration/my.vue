@@ -31,7 +31,7 @@
         <el-table-column prop="teamName" label="队伍名称" width="140" />
         <el-table-column label="接力队员" min-width="220">
           <template #default="{ row }">
-            {{ row.members?.length ? row.members.map((member) => member.realName).join('、') : '—' }}
+            {{ formatMemberNames(row.members) }}
           </template>
         </el-table-column>
         <el-table-column prop="statusName" label="状态" width="100">
@@ -111,14 +111,18 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
+  const map: Record<string, 'warning' | 'success' | 'danger' | 'info'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',
     CANCELLED: 'info'
   }
   return map[status] || 'info'
+}
+
+function formatMemberNames(members: any[] = []): string {
+  return members.map((member: any) => member.realName).filter(Boolean).join('、') || '—'
 }
 
 function handleViewEvent(row: any) {
