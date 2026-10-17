@@ -153,8 +153,9 @@
           <el-form-item label="替补人数" prop="teamReserveCount">
             <el-input-number v-model="formData.teamReserveCount" :min="0" :max="30" />
           </el-form-item>
-          <el-form-item label="每学院队数" prop="maxTeamsPerCollege">
+          <el-form-item label="每学院/班级队数" prop="maxTeamsPerCollege">
             <el-input-number v-model="formData.maxTeamsPerCollege" :min="1" :max="10" />
+            <span class="form-tip">乙组按体育专业年级/班级计算；甲组按学院计算</span>
           </el-form-item>
           <el-form-item label="队员构成规则" prop="teamRosterRule">
             <el-select v-model="formData.teamRosterRule" placeholder="请选择队员构成规则" style="width: 260px">
