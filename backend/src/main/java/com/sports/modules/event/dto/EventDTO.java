@@ -64,6 +64,12 @@ public class EventDTO {
     private LocalDate regEndDate;
 
     /**
+     * 每名学生最多可报名的个人项目数；0 表示不限。
+     */
+    @jakarta.validation.constraints.Min(value = 0, message = "每人限报项目数不能小于0")
+    private Integer maxItemsPerUser;
+
+    /**
      * 举办地点
      */
     @Size(max = 200, message = "举办地点最多200个字符")

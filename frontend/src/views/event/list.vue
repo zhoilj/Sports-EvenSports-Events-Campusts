@@ -16,11 +16,10 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.status" placeholder="请选择" clearable>
-            <el-option label="草稿" value="DRAFT" />
-            <el-option label="已发布" value="PUBLISHED" />
-            <el-option label="进行中" value="ONGOING" />
-            <el-option label="已结束" value="ENDED" />
-            <el-option label="已取消" value="CANCELLED" />
+            <el-option label="草稿" :value="1" />
+            <el-option label="报名中" :value="2" />
+            <el-option label="进行中" :value="3" />
+            <el-option label="已结束" :value="4" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -54,9 +53,9 @@
           <template #default="{ row }">
             <el-button type="primary" link @click="handleView(row)">查看</el-button>
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="row.status === 'DRAFT'" type="success" link @click="handlePublish(row)">发布</el-button>
-            <el-button v-if="row.status !== 'ENDED' && row.status !== 'CANCELLED'" type="danger" link @click="handleCancel(row)">取消</el-button>
-            <el-button v-if="row.status === 'DRAFT' || row.status === 'CANCELLED'" type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 1" type="success" link @click="handlePublish(row)">发布</el-button>
+            <el-button v-if="row.status === 2 || row.status === 3" type="danger" link @click="handleCancel(row)">取消</el-button>
+            <el-button v-if="row.status === 1" type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -100,6 +99,10 @@
         <el-form-item label="报名截止" prop="regEndDate">
           <el-date-picker v-model="formData.regEndDate" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" />
         </el-form-item>
+        <el-form-item label="每人限报" prop="maxItemsPerUser">
+          <el-input-number v-model="formData.maxItemsPerUser" :min="0" :max="20" />
+          <span class="form-tip">0 表示不限个人项目数</span>
+        </el-form-item>
         <el-form-item label="举办地点" prop="location">
           <el-input v-model="formData.location" placeholder="请输入举办地点" />
         </el-form-item>
@@ -138,7 +141,7 @@ const queryParams = reactive({
   size: 10,
   name: '',
   type: '',
-  status: ''
+  status: null as number | null
 })
 
 const dialogVisible = ref(false)
@@ -154,6 +157,7 @@ const formData = reactive({
   endDate: '',
   regStartDate: '',
   regEndDate: '',
+  maxItemsPerUser: 0,
   location: '',
   organizer: '',
   contactPhone: '',
@@ -189,18 +193,17 @@ async function loadData() {
 function resetQuery() {
   queryParams.name = ''
   queryParams.type = ''
-  queryParams.status = ''
+  queryParams.status = null
   queryParams.current = 1
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    DRAFT: 'info',
-    PUBLISHED: 'primary',
-    ONGOING: 'success',
-    ENDED: 'warning',
-    CANCELLED: 'danger'
+function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
+    1: 'info',
+    2: 'primary',
+    3: 'success',
+    4: 'warning'
   }
   return map[status] || 'info'
 }
@@ -210,7 +213,7 @@ function handleAdd() {
   dialogTitle.value = '新增赛事'
   Object.assign(formData, {
     name: '', type: '', startDate: '', endDate: '',
-    regStartDate: '', regEndDate: '', location: '',
+    regStartDate: '', regEndDate: '', maxItemsPerUser: 0, location: '',
     organizer: '', contactPhone: '', description: ''
   })
   dialogVisible.value = true

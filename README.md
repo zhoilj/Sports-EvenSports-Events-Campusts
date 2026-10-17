@@ -57,6 +57,36 @@ mysql -u root -p sports_events < docs/04-DB/schema.sql
 mysql -u root -p sports_events < backend/src/main/resources/db/data.sql
 ```
 
+### 安全环境变量配置
+
+不要将真实数据库密码或 JWT 密钥写入 `application.yml` 或提交到 Git。启动后端前设置：
+
+```bash
+export DB_URL='jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8'
+export DB_USERNAME='your_database_user'
+export DB_PASSWORD='your_database_password'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-bytes-long'
+```
+
+Windows PowerShell 示例：
+
+```powershell
+$env:DB_URL = 'jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8'
+$env:DB_USERNAME = 'your_database_user'
+$env:DB_PASSWORD = 'your_database_password'
+$env:JWT_SECRET = 'replace-with-a-random-secret-at-least-32-bytes-long'
+```
+
+校运会增量迁移脚本按顺序执行：
+
+1. `backend/src/main/resources/db/migration/V1__campus_track_meet_additive.sql`：新增接力队伍/队员、场次参赛名单、检录、田赛试跳试投、积分规则和成绩审计表。
+2. `backend/src/main/resources/db/migration/V2__registration_compatibility_and_relay_config.sql`：兼容补齐 `sport_item.current_participants`，并新增赛事每人限报项目数、接力项目标识、正式队员数和替补人数配置。
+3. `backend/src/main/resources/db/migration/V3__competition_operations.sql`：增加赛程轮次类型、接力成绩关联、成绩状态、复核与正式发布字段；将成绩唯一约束调整为按场次区分，支持同一参赛者参加预赛和决赛。
+4. `backend/src/main/resources/db/migration/V4__official_orderbook_rules.sql`：增加项目组别、性别类别、轮次政策、积分倍率、参与分、破纪录分，以及赛程晋级人数/录取名次和成绩破纪录标记。脚本会按项目名称对既有项目做初步匹配，必须在正式启用前逐项对照学校秩序册复核。
+5. `backend/src/main/resources/db/migration/V5__general_team_event_entries.sql`：增加集体、民体和趣味项目的团队参赛模式、队伍人数、替补人数、每学院/班级队数限制及性别构成规则。
+
+执行前请先备份数据库，并确认当前数据库已包含 `event`、`sport_item`、`registration`、`schedule`、`result` 和 `sys_user` 等基础表。增量迁移已配置 GitHub Actions，在隔离 MySQL 8.0 环境自动验证。**不要在已有业务数据库上重新执行 `docs/04-DB/schema.sql`**，该初始化脚本含有 `DROP TABLE` 语句。
+
 ### 后端启动
 
 ```bash

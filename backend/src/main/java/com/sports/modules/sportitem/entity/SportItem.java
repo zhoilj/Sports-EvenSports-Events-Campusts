@@ -45,10 +45,71 @@ public class SportItem extends BaseEntity {
     private String type;
 
     /**
+     * 是否为接力项目（0-个人项目 1-接力项目）。
+     */
+    @TableField("is_relay")
+    private Integer isRelay;
+
+    /**
+     * 接力队伍必须登记的正式队员人数。
+     */
+    @TableField("relay_member_count")
+    private Integer relayMemberCount;
+
+    /**
+     * 接力队伍允许登记的替补人数。
+     */
+    @TableField("relay_reserve_count")
+    private Integer relayReserveCount;
+
+    /** 1 for any team-based event, including relays and collective/fun events. */
+    @TableField("is_team_event")
+    private Integer isTeamEvent;
+
+    /** Required members for non-relay team events. */
+    @TableField("team_member_count")
+    private Integer teamMemberCount;
+
+    /** Optional reserve members for non-relay team events. */
+    @TableField("team_reserve_count")
+    private Integer teamReserveCount;
+
+    /** Maximum active teams allowed per college for this event item. */
+    @TableField("max_teams_per_college")
+    private Integer maxTeamsPerCollege;
+
+    /**
      * 性别限制（0-不限 1-仅男 2-仅女）
      */
     @TableField("gender_limit")
     private Integer genderLimit;
+
+    /** 甲组/乙组/教工组/不分组：A/B/STAFF/OPEN。 */
+    private String division;
+
+    /** MALE/FEMALE/MIXED/OPEN. */
+    @TableField("gender_category")
+    private String genderCategory;
+
+    /** FINAL_ONLY/PRELIMINARY_FINAL/FLEXIBLE. */
+    @TableField("round_policy")
+    private String roundPolicy;
+
+    /** Official scoring multiplier, e.g. 2 for relay and group events. */
+    @TableField("scoring_multiplier")
+    private Integer scoringMultiplier;
+
+    /** Optional participation points for an eligible checked-in result. */
+    @TableField("participation_points")
+    private Integer participationPoints;
+
+    /** Base points for a record-breaking result before multiplier. */
+    @TableField("record_points")
+    private Integer recordPoints;
+
+    /** Rule for checking the formal roster gender composition. */
+    @TableField("team_roster_rule")
+    private String teamRosterRule;
 
     /**
      * 最大报名人数
@@ -72,6 +133,12 @@ public class SportItem extends BaseEntity {
      */
     @TableField("result_type")
     private String scoreType;
+
+    /**
+     * Result ordering rule: ASC for lower-is-better (e.g. time), DESC for higher-is-better.
+     */
+    @TableField("sort_rule")
+    private String sortRule;
 
     /**
      * 成绩单位

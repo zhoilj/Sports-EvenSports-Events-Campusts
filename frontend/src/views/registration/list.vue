@@ -8,6 +8,12 @@
             <el-option v-for="item in eventOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="学院">
+          <el-input v-model="queryParams.college" placeholder="输入学院名称" clearable />
+        </el-form-item>
+        <el-form-item label="班级">
+          <el-input v-model="queryParams.className" placeholder="输入班级名称" clearable />
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.status" placeholder="请选择" clearable>
             <el-option label="待审核" value="PENDING" />
@@ -27,8 +33,10 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="eventName" label="赛事名称" min-width="150" />
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
-        <el-table-column prop="userName" label="报名人" width="100" />
+        <el-table-column prop="realName" label="报名人" width="100" />
         <el-table-column prop="studentNo" label="学号" width="120" />
+        <el-table-column prop="college" label="学院" min-width="140" />
+        <el-table-column prop="className" label="班级" min-width="120" />
         <el-table-column prop="phone" label="联系电话" width="120" />
         <el-table-column prop="statusName" label="状态" width="100">
           <template #default="{ row }">
@@ -66,16 +74,18 @@
       <el-descriptions :column="2" border>
         <el-descriptions-item label="赛事名称">{{ currentRow.eventName }}</el-descriptions-item>
         <el-descriptions-item label="运动项目">{{ currentRow.sportItemName }}</el-descriptions-item>
-        <el-descriptions-item label="报名人">{{ currentRow.userName }}</el-descriptions-item>
+        <el-descriptions-item label="报名人">{{ currentRow.realName || currentRow.username }}</el-descriptions-item>
         <el-descriptions-item label="学号">{{ currentRow.studentNo }}</el-descriptions-item>
+        <el-descriptions-item label="学院">{{ currentRow.college }}</el-descriptions-item>
+        <el-descriptions-item label="班级">{{ currentRow.className }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ currentRow.phone }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentRow.status)">{{ currentRow.statusName }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="报名时间">{{ currentRow.createTime }}</el-descriptions-item>
-        <el-descriptions-item label="审核时间">{{ currentRow.auditTime }}</el-descriptions-item>
-        <el-descriptions-item label="审核人">{{ currentRow.auditorName }}</el-descriptions-item>
-        <el-descriptions-item label="审核意见">{{ currentRow.auditRemark }}</el-descriptions-item>
+        <el-descriptions-item label="审核时间">{{ currentRow.reviewTime }}</el-descriptions-item>
+        <el-descriptions-item label="审核人">{{ currentRow.reviewerName }}</el-descriptions-item>
+        <el-descriptions-item label="审核意见">{{ currentRow.reviewRemark }}</el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ currentRow.remark }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
@@ -109,6 +119,8 @@ const queryParams = reactive({
   current: 1,
   size: 10,
   eventId: null as number | null,
+  college: '',
+  className: '',
   status: ''
 })
 
@@ -153,13 +165,15 @@ async function loadData() {
 
 function resetQuery() {
   queryParams.eventId = null
+  queryParams.college = ''
+  queryParams.className = ''
   queryParams.status = ''
   queryParams.current = 1
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',

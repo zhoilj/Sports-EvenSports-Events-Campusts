@@ -58,12 +58,24 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/registration/my.vue'),
         meta: { title: '我的报名', icon: 'Tickets', roles: ['STUDENT'] }
       },
+      {
+        path: 'relay-teams',
+        name: 'RelayTeams',
+        component: () => import('@/views/registration/relay-teams.vue'),
+        meta: { title: '接力组队', icon: 'UserFilled', roles: ['ADMIN', 'TEACHER', 'STUDENT'] }
+      },
       // 赛程管理
       {
         path: 'schedules',
         name: 'Schedules',
         component: () => import('@/views/schedule/list.vue'),
         meta: { title: '赛程安排', icon: 'Calendar' }
+      },
+      {
+        path: 'competition-operations',
+        name: 'CompetitionOperations',
+        component: () => import('@/views/competition/operations.vue'),
+        meta: { title: '竞赛执行与检录', icon: 'Finished', roles: ['ADMIN', 'TEACHER'] }
       },
       // 成绩管理
       {
@@ -99,6 +111,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/statistics/index.vue'),
         meta: { title: '统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'] }
       },
+      {
+        path: 'standings',
+        name: 'Standings',
+        component: () => import('@/views/statistics/standings.vue'),
+        meta: { title: '学院积分与奖牌榜', icon: 'Medal', roles: ['ADMIN', 'TEACHER'] }
+      },
       // 个人中心
       {
         path: 'profile',
@@ -122,7 +140,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   // 设置页面标题
   document.title = `${to.meta.title || '校园体育赛事管理系统'} - 校园体育赛事管理系统`
 

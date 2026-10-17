@@ -23,6 +23,8 @@ public class RegistrationVO {
     private String realName;
     private String studentNo;
     private String college;
+    private String className;
+    private String phone;
     private String status;
     private String statusName;
     private Long reviewerId;

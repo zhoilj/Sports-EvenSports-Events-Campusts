@@ -23,6 +23,11 @@ public interface ScheduleService extends IService<Schedule> {
     IPage<Schedule> pageSchedules(Integer current, Integer size, Long eventId, String matchDate);
 
     /**
+     * Validate schedule dates, item ownership, and venue-time overlaps before persistence.
+     */
+    void validateSchedule(Schedule schedule, Long excludeId);
+
+    /**
      * 开始比赛
      */
     void startMatch(Long id);

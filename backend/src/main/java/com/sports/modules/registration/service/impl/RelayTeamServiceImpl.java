@@ -1,0 +1,607 @@
+package com.sports.modules.registration.service.impl;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.sports.common.exception.BusinessException;
+import com.sports.common.result.ResultCode;
+import com.sports.modules.event.entity.Event;
+import com.sports.modules.event.service.EventService;
+import com.sports.modules.registration.dto.RelayTeamCreateDTO;
+import com.sports.modules.registration.entity.RelayTeam;
+import com.sports.modules.registration.entity.RelayTeamMember;
+import com.sports.modules.registration.mapper.RelayTeamMapper;
+import com.sports.modules.registration.mapper.RelayTeamMemberMapper;
+import com.sports.modules.registration.service.RelayTeamService;
+import com.sports.modules.registration.vo.RelayTeamMemberVO;
+import com.sports.modules.registration.vo.RelayTeamVO;
+import com.sports.modules.sportitem.entity.SportItem;
+import com.sports.modules.sportitem.service.SportItemService;
+import com.sports.modules.system.entity.SysUser;
+import com.sports.modules.system.service.SysUserService;
+import com.sports.security.util.SecurityUtils;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.BeanUtils;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam> implements RelayTeamService {
+    private final RelayTeamMemberMapper memberMapper;
+    private final EventService eventService;
+    private final SportItemService sportItemService;
+    private final SysUserService sysUserService;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createTeam(RelayTeamCreateDTO dto) {
+        if (dto == null || dto.getEventId() == null || dto.getSportItemId() == null) {
+            throw new BusinessException("赛事和接力项目不能为空");
+        }
+        Long currentUserId = SecurityUtils.getUserId();
+        SysUser captain = requireActiveStudent(currentUserId);
+        if (!StringUtils.hasText(captain.getCollege())) {
+            throw new BusinessException("请先完善个人资料中的学院信息，再创建接力队伍");
+        }
+
+        Event event = eventService.getById(dto.getEventId());
+        if (event == null) {
+            throw new BusinessException(ResultCode.EVENT_NOT_FOUND);
+        }
+        if (event.getStatus() == null || event.getStatus() != 2) {
+            throw new BusinessException(ResultCode.EVENT_NOT_PUBLISHED);
+        }
+        LocalDate today = LocalDate.now();
+        if (event.getRegStartDate() != null && today.isBefore(event.getRegStartDate())) {
+            throw new BusinessException(ResultCode.EVENT_REGISTRATION_NOT_STARTED);
+        }
+        if (event.getRegEndDate() != null && today.isAfter(event.getRegEndDate())) {
+            throw new BusinessException(ResultCode.EVENT_REGISTRATION_ENDED);
+        }
+
+        // Serialize team capacity checks for a single relay event.
+        SportItem item = sportItemService.getOne(new LambdaQueryWrapper<SportItem>()
+                .eq(SportItem::getId, dto.getSportItemId())
+                .last("FOR UPDATE"));
+        validateRelayItem(item, dto.getEventId());
+
+        long activeTeams = this.count(new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getEventId, dto.getEventId())
+                .eq(RelayTeam::getSportItemId, dto.getSportItemId())
+                .in(RelayTeam::getStatus, 1, 2));
+        Integer maxTeams = item.getMaxParticipants();
+        if (maxTeams != null && maxTeams > 0 && activeTeams >= maxTeams) {
+            throw new BusinessException(ResultCode.REGISTRATION_LIMIT_EXCEEDED);
+        }
+
+        List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
+        validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName(), requiredMemberCount(item));
+        roster = arrangeMixedRelayRoster(roster, item);
+        String teamClassName = resolveTeamClassName(roster, captain.getClassName(), item);
+        int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
+                ? 1 : item.getMaxTeamsPerCollege();
+        LambdaQueryWrapper<RelayTeam> collegeTeamQuery = new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getEventId, dto.getEventId())
+                .eq(RelayTeam::getSportItemId, dto.getSportItemId())
+                .in(RelayTeam::getStatus, 1, 2);
+        boolean divisionB = "B".equalsIgnoreCase(item.getDivision())
+                || (Integer.valueOf(1).equals(item.getIsTeamEvent())
+                && !Integer.valueOf(1).equals(item.getIsRelay()) && isSportsClassName(teamClassName));
+        if (divisionB && StringUtils.hasText(teamClassName)) {
+            collegeTeamQuery.eq(RelayTeam::getClassName, teamClassName);
+        } else {
+            collegeTeamQuery.eq(RelayTeam::getCollege, captain.getCollege());
+        }
+        long collegeTeams = this.count(collegeTeamQuery);
+        if (collegeTeams >= maxPerCollege) {
+            throw new BusinessException("该项目每个" + (divisionB ? "年级/专业班级" : "学院")
+                    + "最多可报名" + maxPerCollege + "支队伍");
+        }
+        ensureMembersAvailable(roster, dto.getEventId(), dto.getSportItemId(), null);
+
+        RelayTeam team = new RelayTeam();
+        team.setEventId(dto.getEventId());
+        team.setSportItemId(dto.getSportItemId());
+        team.setTeamName(dto.getTeamName().trim());
+        team.setCollege(captain.getCollege());
+        team.setClassName(teamClassName);
+        team.setCreatorUserId(currentUserId);
+        team.setStatus(1);
+        this.save(team);
+        saveRoster(team.getId(), roster, requiredMemberCount(item));
+        refreshRelayTeamCount(item);
+        return team.getId();
+    }
+
+    @Override
+    public IPage<RelayTeamVO> pageTeams(Integer current, Integer size, Long eventId, Long sportItemId,
+                                       Integer status, String college) {
+        Page<RelayTeam> page = new Page<>(current, size);
+        LambdaQueryWrapper<RelayTeam> wrapper = new LambdaQueryWrapper<RelayTeam>()
+                .eq(eventId != null, RelayTeam::getEventId, eventId)
+                .eq(sportItemId != null, RelayTeam::getSportItemId, sportItemId)
+                .eq(status != null, RelayTeam::getStatus, status)
+                .like(StringUtils.hasText(college), RelayTeam::getCollege, college)
+                .orderByDesc(RelayTeam::getCreateTime);
+        return this.page(page, wrapper).convert(this::toVO);
+    }
+
+    @Override
+    public List<RelayTeamVO> getMyTeams() {
+        Long userId = SecurityUtils.getUserId();
+        List<Long> memberTeamIds = memberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                        .eq(RelayTeamMember::getUserId, userId))
+                .stream().map(RelayTeamMember::getTeamId).distinct().collect(Collectors.toList());
+        LambdaQueryWrapper<RelayTeam> wrapper = new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getCreatorUserId, userId);
+        if (!memberTeamIds.isEmpty()) {
+            wrapper.or().in(RelayTeam::getId, memberTeamIds);
+        }
+        return this.list(wrapper).stream().map(this::toVO).collect(Collectors.toList());
+    }
+
+    @Override
+    public RelayTeamVO getTeamDetail(Long id) {
+        RelayTeam team = this.getById(id);
+        if (team == null) {
+            throw new BusinessException("接力队伍不存在");
+        }
+        Long userId = SecurityUtils.getUserId();
+        SysUser current = sysUserService.getById(userId);
+        boolean staff = current != null && ("ADMIN".equals(current.getRole()) || "TEACHER".equals(current.getRole()));
+        boolean member = memberMapper.selectCount(new LambdaQueryWrapper<RelayTeamMember>()
+                .eq(RelayTeamMember::getTeamId, id)
+                .eq(RelayTeamMember::getUserId, userId)) > 0;
+        if (!staff && !team.getCreatorUserId().equals(userId) && !member) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+        return toVO(team);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void reviewTeam(Long id, Integer status, String remark) {
+        if (status == null || (status != 2 && status != 3)) {
+            throw new BusinessException("审核状态只能为通过或拒绝");
+        }
+        RelayTeam team = this.getById(id);
+        if (team == null) {
+            throw new BusinessException("接力队伍不存在");
+        }
+        if (team.getStatus() == null || team.getStatus() != 1) {
+            throw new BusinessException("只能审核待审核的接力队伍");
+        }
+        team.setStatus(status);
+        team.setReviewerId(SecurityUtils.getUserId());
+        team.setReviewTime(LocalDateTime.now());
+        team.setReviewRemark(remark);
+        this.updateById(team);
+        if (status == 3) {
+            SportItem item = sportItemService.getById(team.getSportItemId());
+            if (item != null) refreshRelayTeamCount(item);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelTeam(Long id) {
+        RelayTeam team = this.getById(id);
+        if (team == null) throw new BusinessException("接力队伍不存在");
+        Long userId = SecurityUtils.getUserId();
+        if (!team.getCreatorUserId().equals(userId) && !SecurityUtils.isAdmin()) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+        if (team.getStatus() == null || team.getStatus() != 1) {
+            throw new BusinessException("仅待审核的接力队伍可以取消");
+        }
+        team.setStatus(4);
+        this.updateById(team);
+        SportItem item = sportItemService.getById(team.getSportItemId());
+        if (item != null) refreshRelayTeamCount(item);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void replaceMembers(Long id, List<Long> memberUserIds) {
+        RelayTeam team = this.getById(id);
+        if (team == null) throw new BusinessException("接力队伍不存在");
+        if (!team.getCreatorUserId().equals(SecurityUtils.getUserId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN);
+        }
+        if (team.getStatus() == null || team.getStatus() != 1) {
+            throw new BusinessException("队伍审核通过后不能修改队员");
+        }
+        SportItem item = sportItemService.getById(team.getSportItemId());
+        validateRelayItem(item, team.getEventId());
+        List<Long> roster = normalizeRoster(memberUserIds, team.getCreatorUserId(), item);
+        validateRosterUsers(roster, team.getCollege(), item, team.getClassName(), requiredMemberCount(item));
+        roster = arrangeMixedRelayRoster(roster, item);
+        SysUser creator = sysUserService.getById(team.getCreatorUserId());
+        String fallbackClass = creator == null ? team.getClassName() : creator.getClassName();
+        team.setClassName(resolveTeamClassName(roster, fallbackClass, item));
+        int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
+                ? 1 : item.getMaxTeamsPerCollege();
+        boolean divisionB = "B".equalsIgnoreCase(item.getDivision())
+                || (Integer.valueOf(1).equals(item.getIsTeamEvent())
+                && !Integer.valueOf(1).equals(item.getIsRelay()) && isSportsClassName(team.getClassName()));
+        LambdaQueryWrapper<RelayTeam> teamLimitQuery = new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getEventId, team.getEventId())
+                .eq(RelayTeam::getSportItemId, team.getSportItemId())
+                .ne(RelayTeam::getId, team.getId())
+                .in(RelayTeam::getStatus, 1, 2);
+        if (divisionB && StringUtils.hasText(team.getClassName())) {
+            teamLimitQuery.eq(RelayTeam::getClassName, team.getClassName());
+        } else {
+            teamLimitQuery.eq(RelayTeam::getCollege, team.getCollege());
+        }
+        if (this.count(teamLimitQuery) >= maxPerCollege) {
+            throw new BusinessException("调整队员后会超过该项目每个"
+                    + (divisionB ? "年级/专业班级" : "学院") + "的队伍数量限制");
+        }
+        this.updateById(team);
+        ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
+        memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
+        saveRoster(id, roster, requiredMemberCount(item));
+    }
+
+    @Override
+    public List<RelayTeamMemberVO> getEligibleMembers(Long sportItemId, Long teamId, String keyword) {
+        SysUser captain = requireActiveStudent(SecurityUtils.getUserId());
+        if (!StringUtils.hasText(captain.getCollege())) {
+            throw new BusinessException("请先完善个人资料中的学院信息");
+        }
+        Set<Long> occupiedUserIds = new HashSet<>();
+        if (sportItemId != null) {
+            List<Long> occupiedTeamIds = this.list(new LambdaQueryWrapper<RelayTeam>()
+                            .eq(RelayTeam::getSportItemId, sportItemId)
+                            .ne(teamId != null, RelayTeam::getId, teamId)
+                            .in(RelayTeam::getStatus, 1, 2))
+                    .stream().map(RelayTeam::getId).collect(Collectors.toList());
+            if (!occupiedTeamIds.isEmpty()) {
+                occupiedUserIds.addAll(memberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                                .in(RelayTeamMember::getTeamId, occupiedTeamIds))
+                        .stream().map(RelayTeamMember::getUserId).collect(Collectors.toSet()));
+            }
+        }
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getRole, "STUDENT")
+                .eq(SysUser::getStatus, 1)
+                .eq(SysUser::getCollege, captain.getCollege())
+                .notIn(!occupiedUserIds.isEmpty(), SysUser::getId, occupiedUserIds)
+                .and(StringUtils.hasText(keyword), q -> q.like(SysUser::getRealName, keyword)
+                        .or().like(SysUser::getStudentNo, keyword)
+                        .or().like(SysUser::getClassName, keyword))
+                .orderByAsc(SysUser::getClassName)
+                .orderByAsc(SysUser::getStudentNo);
+        return sysUserService.list(wrapper).stream().map(this::memberSearchVO).collect(Collectors.toList());
+    }
+
+    private SysUser requireActiveStudent(Long userId) {
+        SysUser user = sysUserService.getById(userId);
+        if (user == null || user.getStatus() == null || user.getStatus() != 1
+                || !"STUDENT".equals(user.getRole())) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "仅状态正常的学生账号可以创建接力队伍");
+        }
+        return user;
+    }
+
+    private void validateRelayItem(SportItem item, Long eventId) {
+        if (item == null || !java.util.Objects.equals(item.getEventId(), eventId)) {
+            throw new BusinessException(ResultCode.SPORT_ITEM_NOT_FOUND);
+        }
+        if (item.getStatus() == null || item.getStatus() != 1) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "该项目当前未开放报名");
+        }
+        boolean relay = Integer.valueOf(1).equals(item.getIsRelay());
+        boolean teamEvent = Integer.valueOf(1).equals(item.getIsTeamEvent());
+        if (!relay && !teamEvent) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "所选项目不是接力或集体队伍项目");
+        }
+    }
+
+    private List<Long> normalizeRoster(List<Long> requestedIds, Long creatorId, SportItem item) {
+        if (requestedIds == null) throw new BusinessException("请登记接力队员");
+        List<Long> roster = new ArrayList<>(requestedIds);
+        if (roster.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new BusinessException("队员列表包含无效用户");
+        }
+        if (new HashSet<>(roster).size() != roster.size()) {
+            throw new BusinessException("同一队伍不能重复登记同一名队员");
+        }
+        if (!roster.contains(creatorId)) roster.add(0, creatorId);
+        int required = requiredMemberCount(item);
+        int reserves = reserveMemberCount(item);
+        if (required < 1) {
+            throw new BusinessException("请先在项目管理中配置该团体项目的队伍人数");
+        }
+        if (roster.size() < required || roster.size() > required + reserves) {
+            throw new BusinessException("该项目要求" + required + "名正式队员，最多另加" + reserves + "名替补队员");
+        }
+        return roster;
+    }
+
+    private void validateRosterUsers(List<Long> roster, String college, SportItem item, String captainClass, int formalCount) {
+        for (Long userId : roster) {
+            SysUser user = requireActiveStudent(userId);
+            if (!StringUtils.hasText(user.getCollege()) || !user.getCollege().equals(college)) {
+                throw new BusinessException("接力队员必须来自队伍所属学院");
+            }
+            boolean genericTeam = Integer.valueOf(1).equals(item.getIsTeamEvent())
+                    && !Integer.valueOf(1).equals(item.getIsRelay());
+            if (!genericTeam && "B".equalsIgnoreCase(item.getDivision()) && StringUtils.hasText(captainClass)
+                    && !captainClass.equals(user.getClassName())) {
+                throw new BusinessException("乙组接力队员必须来自同一年级/专业班级，团体积分按班级归属统计");
+            }
+            boolean relay = Integer.valueOf(1).equals(item.getIsRelay());
+            boolean mixedRelay = relay && ("MIXED".equalsIgnoreCase(item.getGenderCategory())
+                    || (item.getName() != null && item.getName().contains("混合接力")));
+            if (relay && !mixedRelay && "MALE".equalsIgnoreCase(item.getGenderCategory())
+                    && !Objects.equals(user.getGender(), 1)) {
+                throw new BusinessException("男子接力项目的队员必须全部为男性");
+            }
+            if (relay && !mixedRelay && "FEMALE".equalsIgnoreCase(item.getGenderCategory())
+                    && !Objects.equals(user.getGender(), 2)) {
+                throw new BusinessException("女子接力项目的队员必须全部为女性");
+            }
+            if (relay && !mixedRelay && Integer.valueOf(1).equals(item.getGenderLimit())
+                    && !Objects.equals(user.getGender(), 1)) {
+                throw new BusinessException("该接力项目仅限男性参赛");
+            }
+            if (relay && !mixedRelay && Integer.valueOf(2).equals(item.getGenderLimit())
+                    && !Objects.equals(user.getGender(), 2)) {
+                throw new BusinessException("该接力项目仅限女性参赛");
+            }
+        }
+        boolean genericTeam = Integer.valueOf(1).equals(item.getIsTeamEvent())
+                && !Integer.valueOf(1).equals(item.getIsRelay());
+        if (genericTeam) {
+            Set<String> sportsClasses = roster.stream()
+                    .map(sysUserService::getById)
+                    .filter(Objects::nonNull)
+                    .map(SysUser::getClassName)
+                    .filter(StringUtils::hasText)
+                    .filter(this::isSportsClassName)
+                    .collect(Collectors.toSet());
+            if (sportsClasses.size() > 1) {
+                throw new BusinessException("乙组团队成员只能归属一个体育专业年级/班级");
+            }
+            if ("B".equalsIgnoreCase(item.getDivision()) && sportsClasses.isEmpty()) {
+                throw new BusinessException("乙组团队至少需要一名体育专业类学生，混合甲乙组队伍按乙组归属");
+            }
+        }
+        if (!Integer.valueOf(1).equals(item.getIsRelay())) {
+            List<Long> formalMembers = roster.subList(0, Math.min(formalCount, roster.size()));
+            int maleCount = 0;
+            int femaleCount = 0;
+            for (Long userId : formalMembers) {
+                SysUser user = sysUserService.getById(userId);
+                if (user == null) throw new BusinessException("参赛队员账号不存在");
+                if (Objects.equals(user.getGender(), 1)) maleCount++;
+                else if (Objects.equals(user.getGender(), 2)) femaleCount++;
+            }
+            String rule = item.getTeamRosterRule() == null ? "ANY" : item.getTeamRosterRule();
+            boolean valid = switch (rule) {
+                case "MALE_ONLY" -> maleCount == formalCount;
+                case "FEMALE_ONLY" -> femaleCount == formalCount;
+                case "MIXED_5M5F" -> formalCount == 10 && maleCount == 5 && femaleCount == 5;
+                case "MIXED_10M10F" -> formalCount == 20 && maleCount == 10 && femaleCount == 10;
+                case "MIXED_15M15F" -> formalCount == 30 && maleCount == 15 && femaleCount == 15;
+                case "MIXED_3M3F" -> formalCount == 6 && maleCount == 3 && femaleCount == 3;
+                case "MIXED_6M4F" -> formalCount == 10 && maleCount == 6 && femaleCount == 4;
+                case "MIXED_2M2F_MIN" -> formalCount == 5 && maleCount >= 2 && femaleCount >= 2
+                        && maleCount + femaleCount == formalCount;
+                case "PAIRS_1M1F" -> validMixedPairs(formalMembers);
+                case "MIXED_MIN_6F" -> validBoardShoeGroups(formalMembers);
+                default -> true;
+            };
+            if (!valid) {
+                throw new BusinessException("参赛队员性别构成不符合项目规程（当前男" + maleCount + "人、女" + femaleCount + "人；规则：" + rule + "）");
+            }
+        }
+    }
+
+    private boolean validMixedPairs(List<Long> formalMembers) {
+        if (formalMembers.size() != 20 || formalMembers.size() % 2 != 0) return false;
+        for (int i = 0; i < formalMembers.size(); i += 2) {
+            SysUser first = sysUserService.getById(formalMembers.get(i));
+            SysUser second = sysUserService.getById(formalMembers.get(i + 1));
+            if (first == null || second == null || first.getGender() == null || second.getGender() == null
+                    || Objects.equals(first.getGender(), second.getGender())
+                    || !Set.of(1, 2).contains(first.getGender()) || !Set.of(1, 2).contains(second.getGender())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validBoardShoeGroups(List<Long> formalMembers) {
+        if (formalMembers.size() != 18) return false;
+        for (int start = 0; start < formalMembers.size(); start += 3) {
+            int femaleCount = 0;
+            for (int i = start; i < start + 3; i++) {
+                SysUser user = sysUserService.getById(formalMembers.get(i));
+                if (user == null || user.getGender() == null || !Set.of(1, 2).contains(user.getGender())) return false;
+                if (Objects.equals(user.getGender(), 2)) femaleCount++;
+            }
+            if (femaleCount < 1) return false;
+        }
+        return true;
+    }
+
+    private List<Long> arrangeMixedRelayRoster(List<Long> roster, SportItem item) {
+        if (item == null || !Integer.valueOf(1).equals(item.getIsRelay())
+                || !("MIXED".equalsIgnoreCase(item.getGenderCategory())
+                || (item.getName() != null && item.getName().contains("混合接力")))) {
+            return roster;
+        }
+        int required = item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount();
+        if (required != 4) throw new BusinessException("混合接力必须配置4名正式队员");
+        List<Long> women = new ArrayList<>();
+        List<Long> men = new ArrayList<>();
+        for (Long userId : roster) {
+            SysUser user = sysUserService.getById(userId);
+            if (user == null) throw new BusinessException("接力队员账号不存在");
+            if (Objects.equals(user.getGender(), 2)) women.add(userId);
+            else if (Objects.equals(user.getGender(), 1)) men.add(userId);
+        }
+        if (women.size() < 2 || men.size() < 2) {
+            throw new BusinessException("混合接力正式队员须至少2男2女，且第1、3棒为女生，第2、4棒为男生");
+        }
+        List<Long> arranged = new ArrayList<>();
+        arranged.add(women.get(0)); // Leg 1: female
+        arranged.add(men.get(0));   // Leg 2: male
+        arranged.add(women.get(1)); // Leg 3: female
+        arranged.add(men.get(1));   // Leg 4: male
+        Set<Long> formal = new HashSet<>(arranged);
+        for (Long userId : roster) {
+            if (!formal.contains(userId)) arranged.add(userId);
+        }
+        return arranged;
+    }
+
+    private void ensureMembersAvailable(List<Long> roster, Long eventId, Long sportItemId, Long excludedTeamId) {
+        if (roster.isEmpty()) return;
+        List<RelayTeamMember> memberships = memberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                .in(RelayTeamMember::getUserId, roster));
+        Set<Long> teamIds = memberships.stream().map(RelayTeamMember::getTeamId).collect(Collectors.toSet());
+        if (teamIds.isEmpty()) return;
+        List<RelayTeam> existingTeams = this.list(new LambdaQueryWrapper<RelayTeam>()
+                .in(RelayTeam::getId, teamIds)
+                .eq(RelayTeam::getEventId, eventId)
+                .eq(RelayTeam::getSportItemId, sportItemId)
+                .in(RelayTeam::getStatus, 1, 2));
+        for (RelayTeam existing : existingTeams) {
+            if (excludedTeamId == null || !excludedTeamId.equals(existing.getId())) {
+                throw new BusinessException("队员已参加该项目的其他待审或已通过队伍");
+            }
+        }
+    }
+
+    private String resolveTeamClassName(List<Long> roster, String fallbackClass, SportItem item) {
+        if (item == null || !Integer.valueOf(1).equals(item.getIsTeamEvent())
+                || Integer.valueOf(1).equals(item.getIsRelay())) return fallbackClass;
+        Set<String> sportsClasses = roster.stream()
+                .map(sysUserService::getById)
+                .filter(Objects::nonNull)
+                .map(SysUser::getClassName)
+                .filter(StringUtils::hasText)
+                .filter(this::isSportsClassName)
+                .collect(Collectors.toSet());
+        return sportsClasses.isEmpty() ? fallbackClass : sportsClasses.iterator().next();
+    }
+
+    private boolean isSportsClassName(String className) {
+        if (!StringUtils.hasText(className)) return false;
+        return className.matches(".*(社体|体教|体育教育|社会体育|运动训练|休闲体育|体育保健).*");
+    }
+
+    private int requiredMemberCount(SportItem item) {
+        if (item == null) return 0;
+        if (Integer.valueOf(1).equals(item.getIsRelay())) {
+            return item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount();
+        }
+        return item.getTeamMemberCount() == null ? 0 : item.getTeamMemberCount();
+    }
+
+    private int reserveMemberCount(SportItem item) {
+        if (item == null) return 0;
+        if (Integer.valueOf(1).equals(item.getIsRelay())) {
+            return item.getRelayReserveCount() == null ? 0 : item.getRelayReserveCount();
+        }
+        return item.getTeamReserveCount() == null ? 0 : item.getTeamReserveCount();
+    }
+
+    private void saveRoster(Long teamId, List<Long> roster, int formalCount) {
+        List<RelayTeamMember> members = new ArrayList<>();
+        for (int i = 0; i < roster.size(); i++) {
+            RelayTeamMember member = new RelayTeamMember();
+            member.setTeamId(teamId);
+            member.setUserId(roster.get(i));
+            member.setLegOrder(i + 1);
+            member.setReserve(i >= formalCount ? 1 : 0);
+            members.add(member);
+        }
+        for (RelayTeamMember member : members) {
+            memberMapper.insert(member);
+        }
+    }
+
+    private void refreshRelayTeamCount(SportItem item) {
+        long activeTeams = this.count(new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getSportItemId, item.getId())
+                .in(RelayTeam::getStatus, 1, 2));
+        item.setCurrentParticipants(Math.toIntExact(activeTeams));
+        sportItemService.updateById(item);
+    }
+
+    private RelayTeamVO toVO(RelayTeam team) {
+        RelayTeamVO vo = new RelayTeamVO();
+        BeanUtils.copyProperties(team, vo);
+        Event event = eventService.getById(team.getEventId());
+        if (event != null) vo.setEventName(event.getName());
+        SportItem item = sportItemService.getById(team.getSportItemId());
+        if (item != null) {
+            vo.setSportItemName(item.getName());
+            vo.setIsRelay(item.getIsRelay());
+            vo.setIsTeamEvent(item.getIsTeamEvent());
+        }
+        SysUser creator = sysUserService.getById(team.getCreatorUserId());
+        if (creator != null) vo.setCreatorName(creator.getRealName());
+        if (team.getReviewerId() != null) {
+            SysUser reviewer = sysUserService.getById(team.getReviewerId());
+            if (reviewer != null) vo.setReviewerName(reviewer.getRealName());
+        }
+        vo.setStatusName(switch (team.getStatus() == null ? 0 : team.getStatus()) {
+            case 1 -> "待审核";
+            case 2 -> "已通过";
+            case 3 -> "已拒绝";
+            case 4 -> "已取消";
+            default -> "未知";
+        });
+        List<RelayTeamMemberVO> members = memberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                        .eq(RelayTeamMember::getTeamId, team.getId())
+                        .orderByAsc(RelayTeamMember::getLegOrder))
+                .stream().map(this::toMemberVO).collect(Collectors.toList());
+        vo.setMembers(members);
+        return vo;
+    }
+
+    private RelayTeamMemberVO toMemberVO(RelayTeamMember member) {
+        RelayTeamMemberVO vo = new RelayTeamMemberVO();
+        vo.setUserId(member.getUserId());
+        vo.setLegOrder(member.getLegOrder());
+        vo.setReserve(member.getReserve() != null && member.getReserve() == 1);
+        SysUser user = sysUserService.getById(member.getUserId());
+        if (user != null) {
+            vo.setRealName(user.getRealName());
+            vo.setUsername(user.getUsername());
+            vo.setStudentNo(user.getStudentNo());
+            vo.setCollege(user.getCollege());
+            vo.setClassName(user.getClassName());
+        }
+        return vo;
+    }
+
+    private RelayTeamMemberVO memberSearchVO(SysUser user) {
+        RelayTeamMemberVO vo = new RelayTeamMemberVO();
+        vo.setUserId(user.getId());
+        vo.setRealName(user.getRealName());
+        vo.setUsername(user.getUsername());
+        vo.setStudentNo(user.getStudentNo());
+        vo.setCollege(user.getCollege());
+        vo.setClassName(user.getClassName());
+        return vo;
+    }
+}

@@ -39,6 +39,14 @@ public class CompetitionResultVO {
      * 用户ID
      */
     private Long userId;
+
+    private Long registrationId;
+
+    private Long scheduleId;
+
+    private Long relayTeamId;
+
+    private String relayTeamName;
     
     /**
      * 用户名
@@ -69,6 +77,24 @@ public class CompetitionResultVO {
      * 成绩单位
      */
     private String unit;
+
+    private String scoreText;
+
+    private String resultStatus;
+
+    private Integer reviewStatus;
+
+    private Long reviewerId;
+
+    private String reviewerName;
+
+    private LocalDateTime reviewTime;
+
+    private String reviewRemark;
+
+    private Integer isPublished;
+
+    private LocalDateTime publishedAt;
     
     /**
      * 名次

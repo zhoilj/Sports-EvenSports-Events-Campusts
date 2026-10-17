@@ -5,6 +5,12 @@ import com.sports.common.exception.BusinessException;
 import com.sports.common.result.Result;
 import com.sports.common.result.ResultCode;
 import com.sports.modules.schedule.entity.Schedule;
+import com.sports.modules.schedule.dto.ScheduleEntryGenerateDTO;
+import com.sports.modules.schedule.dto.AdvanceEntriesDTO;
+import com.sports.modules.schedule.dto.ScheduleEntryPositionDTO;
+import com.sports.modules.schedule.service.ScheduleEntryService;
+import com.sports.modules.schedule.vo.ScheduleEntryVO;
+import com.sports.modules.schedule.vo.ScheduleConflictVO;
 import com.sports.modules.schedule.service.ScheduleService;
 import com.sports.modules.schedule.vo.ScheduleVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +19,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 赛程 Controller
@@ -26,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
+    private final ScheduleEntryService scheduleEntryService;
 
     @Operation(summary = "分页查询赛程")
     @GetMapping
@@ -51,10 +59,11 @@ public class ScheduleController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Long> create(@Valid @RequestBody Schedule schedule) {
-        // 设置默认状态
-        if (schedule.getStatus() == null) {
-            schedule.setStatus(1);
-        }
+        // 设置默认状态和轮次类型。
+        if (schedule.getStatus() == null) schedule.setStatus(1);
+        if (schedule.getRoundNo() == null) schedule.setRoundNo(1);
+        if (schedule.getRoundType() == null) schedule.setRoundType("FINAL");
+        scheduleService.validateSchedule(schedule, null);
         scheduleService.save(schedule);
         return Result.success(schedule.getId());
     }
@@ -62,13 +71,27 @@ public class ScheduleController {
     @Operation(summary = "更新赛程")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody Schedule schedule) {
         Schedule existing = scheduleService.getById(id);
         if (existing == null) {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
         }
         schedule.setId(id);
+        if (schedule.getRoundType() == null) schedule.setRoundType(existing.getRoundType() == null ? "FINAL" : existing.getRoundType());
+        long entryCount = scheduleEntryService.count(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.sports.modules.schedule.entity.ScheduleEntry>()
+                .eq(com.sports.modules.schedule.entity.ScheduleEntry::getScheduleId, id));
+        if (entryCount > 0 && (!java.util.Objects.equals(existing.getEventId(), schedule.getEventId())
+                || !java.util.Objects.equals(existing.getSportItemId(), schedule.getSportItemId())
+                || !java.util.Objects.equals(existing.getRoundType(), schedule.getRoundType()))) {
+            throw new BusinessException("赛程已生成参赛名单，不能更换赛事、项目或轮次类型");
+        }
+        scheduleService.validateSchedule(schedule, id);
         scheduleService.updateById(schedule);
+        java.util.List<ScheduleConflictVO> conflicts = scheduleEntryService.checkTimeConflicts(id);
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("修改赛程后出现参赛者时间冲突：" + conflicts.get(0).getMessage());
+        }
         return Result.success();
     }
 
@@ -80,14 +103,62 @@ public class ScheduleController {
         if (existing == null) {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
         }
+        long entryCount = scheduleEntryService.count(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.sports.modules.schedule.entity.ScheduleEntry>()
+                .eq(com.sports.modules.schedule.entity.ScheduleEntry::getScheduleId, id));
+        if (entryCount > 0) {
+            throw new BusinessException("赛程已生成参赛名单，不能直接删除；请先处理参赛名单");
+        }
         scheduleService.removeById(id);
         return Result.success();
+    }
+
+    @Operation(summary = "查询赛程参赛名单")
+    @GetMapping("/{id}/entries")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<java.util.List<ScheduleEntryVO>> getEntries(@PathVariable Long id) {
+        return Result.success(scheduleEntryService.listEntryDetails(id));
+    }
+
+    @Operation(summary = "检查参赛者赛程时间冲突")
+    @GetMapping("/{id}/conflicts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<java.util.List<ScheduleConflictVO>> getConflicts(@PathVariable Long id) {
+        return Result.success(scheduleEntryService.checkTimeConflicts(id));
+    }
+
+    @Operation(summary = "按已通过报名生成分组分道")
+    @PostMapping("/{id}/entries/generate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Integer> generateEntries(@PathVariable Long id,
+                                           @Valid @RequestBody(required = false) ScheduleEntryGenerateDTO dto) {
+        int groupSize = dto == null || dto.getGroupSize() == null ? 8 : dto.getGroupSize();
+        int laneCount = dto == null || dto.getLaneCount() == null ? 8 : dto.getLaneCount();
+        return Result.success("已生成参赛名单", scheduleEntryService.generateEntries(id, groupSize, laneCount));
+    }
+
+    @Operation(summary = "保存官方分组分道与田赛顺序")
+    @PutMapping("/{id}/entries/positions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Integer> updateEntryPositions(@PathVariable Long id,
+                                                @Valid @RequestBody java.util.List<@Valid ScheduleEntryPositionDTO> positions) {
+        return Result.success("分组分道已保存", scheduleEntryService.updateEntryPositions(id, positions));
+    }
+
+    @Operation(summary = "按预赛成绩晋级下一轮")
+    @PostMapping("/advance")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Integer> advanceEntries(@Valid @RequestBody AdvanceEntriesDTO dto) {
+        return Result.success("晋级名单已生成", scheduleEntryService.advanceEntries(dto));
     }
 
     @Operation(summary = "开始比赛")
     @PostMapping("/{id}/start")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> startMatch(@PathVariable Long id) {
+        java.util.List<ScheduleConflictVO> conflicts = scheduleEntryService.checkTimeConflicts(id);
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("当前赛程存在参赛者时间冲突，不能开始：" + conflicts.get(0).getMessage());
+        }
         scheduleService.startMatch(id);
         return Result.success();
     }

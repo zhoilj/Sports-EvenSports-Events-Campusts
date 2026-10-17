@@ -22,6 +22,7 @@
         <el-button type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>新增赛程
         </el-button>
+        <el-button @click="goToOperations">竞赛执行与检录</el-button>
       </div>
 
       <!-- 数据表格 -->
@@ -31,6 +32,15 @@
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
         <el-table-column prop="scheduleName" label="赛程名称" width="100" />
         <el-table-column prop="roundNo" label="轮次" width="80" />
+        <el-table-column prop="roundType" label="轮次类型" width="110">
+          <template #default="{ row }">{{ roundTypeName(row.roundType) }}</template>
+        </el-table-column>
+        <el-table-column prop="qualificationCount" label="晋级人数" width="90">
+          <template #default="{ row }">{{ row.qualificationCount ?? '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="awardCount" label="录取名次" width="90">
+          <template #default="{ row }">{{ row.awardCount ?? '—' }}</template>
+        </el-table-column>
         <el-table-column prop="groupNo" label="分组" width="80" />
         <el-table-column prop="matchDate" label="比赛日期" width="120" />
         <el-table-column prop="startTime" label="开始时间" width="100" />
@@ -83,6 +93,22 @@
         <el-form-item label="轮次" prop="roundNo">
           <el-input-number v-model="formData.roundNo" :min="1" :max="10" />
         </el-form-item>
+        <el-form-item label="轮次类型" prop="roundType">
+          <el-select v-model="formData.roundType" placeholder="请选择轮次类型">
+            <el-option label="预赛" value="PRELIMINARY" />
+            <el-option label="半决赛" value="SEMIFINAL" />
+            <el-option label="决赛" value="FINAL" />
+            <el-option label="田赛决赛" value="FIELD_FINAL" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="['PRELIMINARY', 'SEMIFINAL'].includes(formData.roundType)" label="总晋级人数" prop="qualificationCount" required>
+          <el-input-number v-model="formData.qualificationCount" :min="1" :max="128" />
+          <span class="form-tip">例如：100米预赛8人晋级决赛</span>
+        </el-form-item>
+        <el-form-item v-if="['FINAL', 'FIELD_FINAL'].includes(formData.roundType)" label="录取名次" prop="awardCount" required>
+          <el-input-number v-model="formData.awardCount" :min="1" :max="128" />
+          <span class="form-tip">必须按秩序册逐项填写，不能留空</span>
+        </el-form-item>
         <el-form-item label="分组" prop="groupNo">
           <el-input v-model="formData.groupNo" placeholder="如：A组、B组" />
         </el-form-item>
@@ -93,8 +119,11 @@
           <el-time-picker v-model="formData.startTime" placeholder="选择时间" format="HH:mm" value-format="HH:mm" />
         </el-form-item>
         <el-form-item label="结束时间" prop="endTime">
-          <el-time-picker v-model="formData.endTime" placeholder="选择时间" format="HH:mm" value-format="HH:mm" />
+          <el-time-picker v-model="formData.endTime" placeholder="建议填写结束时间" format="HH:mm" value-format="HH:mm" />
         </el-form-item>
+        <el-alert type="info" :closable="false" show-icon>
+          秩序册只列开始时间时，请根据下一场时间设置合理结束时间。田径场建议细分为“径赛跑道、跳高区、跳远区、投掷区”等比赛区域，以允许不同区域并行比赛。
+        </el-alert>
         <el-form-item label="场地" prop="location">
           <el-input v-model="formData.location" placeholder="请输入比赛场地" />
         </el-form-item>
@@ -114,7 +143,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const loading = ref(false)
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -139,6 +170,9 @@ const formData = reactive({
   sportItemId: null as number | null,
   scheduleName: '',
   roundNo: 1,
+  roundType: 'FINAL',
+  qualificationCount: null as number | null,
+  awardCount: null as number | null,
   groupNo: '',
   matchDate: '',
   startTime: '',
@@ -198,8 +232,17 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: number) {
-  const map: Record<number, string> = {
+function goToOperations() {
+  router.push('/competition-operations')
+}
+
+function roundTypeName(type: string) {
+  const map: Record<string, string> = { PRELIMINARY: '预赛', SEMIFINAL: '半决赛', FINAL: '决赛', FIELD_FINAL: '田赛决赛' }
+  return map[type] || type || '决赛'
+}
+
+function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     1: 'info',      // 未开始
     2: 'primary',   // 进行中
     3: 'success',   // 已结束
@@ -222,18 +265,23 @@ function handleAdd() {
   editingId.value = null
   dialogTitle.value = '新增赛程'
   Object.assign(formData, {
-    eventId: null, sportItemId: null, scheduleName: '', roundNo: 1,
+    eventId: null, sportItemId: null, scheduleName: '', roundNo: 1, roundType: 'FINAL',
+    qualificationCount: null, awardCount: null,
     groupNo: '', matchDate: '', startTime: '', endTime: '', location: '', remark: ''
   })
   sportItemOptions.value = []
   dialogVisible.value = true
 }
 
-function handleEdit(row: any) {
+async function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑赛程'
   Object.assign(formData, row)
-  onEventChange(row.eventId)
+  await onEventChange(row.eventId)
+  formData.sportItemId = row.sportItemId
+  formData.roundType = row.roundType || 'FINAL'
+  formData.qualificationCount = row.qualificationCount ?? null
+  formData.awardCount = row.awardCount ?? null
   dialogVisible.value = true
 }
 

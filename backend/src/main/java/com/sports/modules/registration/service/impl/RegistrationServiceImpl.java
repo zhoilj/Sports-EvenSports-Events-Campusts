@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -47,67 +48,104 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
     @Transactional(rollbackFor = Exception.class)
     public Long register(RegistrationDTO dto) {
         Long userId = SecurityUtils.getUserId();
-
-        // 检查是否已报名
-        if (hasRegistered(dto.getEventId(), dto.getSportItemId(), userId)) {
-            throw new BusinessException(ResultCode.REGISTRATION_ALREADY_EXISTS);
+        if (dto == null || dto.getEventId() == null || dto.getSportItemId() == null) {
+            throw new BusinessException("赛事和项目不能为空");
         }
 
-        // 检查赛事状态
         Event event = eventService.getById(dto.getEventId());
         if (event == null) {
             throw new BusinessException(ResultCode.EVENT_NOT_FOUND);
         }
-        // 检查赛事状态 (2-报名中)
         if (event.getStatus() == null || event.getStatus() != 2) {
             throw new BusinessException(ResultCode.EVENT_NOT_PUBLISHED);
         }
 
-        // 检查报名时间
         LocalDate today = LocalDate.now();
-        if (today.isBefore(event.getRegStartDate())) {
+        if (event.getRegStartDate() != null && today.isBefore(event.getRegStartDate())) {
             throw new BusinessException(ResultCode.EVENT_REGISTRATION_NOT_STARTED);
         }
-        if (today.isAfter(event.getRegEndDate())) {
+        if (event.getRegEndDate() != null && today.isAfter(event.getRegEndDate())) {
             throw new BusinessException(ResultCode.EVENT_REGISTRATION_ENDED);
         }
 
-        // 检查项目
-        SportItem sportItem = sportItemService.getById(dto.getSportItemId());
-        if (sportItem == null || !sportItem.getEventId().equals(dto.getEventId())) {
+        // Lock the item row before checking capacity so concurrent submissions cannot oversubscribe it.
+        SportItem sportItem = sportItemService.getOne(new LambdaQueryWrapper<SportItem>()
+                .eq(SportItem::getId, dto.getSportItemId())
+                .last("FOR UPDATE"));
+        if (sportItem == null || !java.util.Objects.equals(sportItem.getEventId(), dto.getEventId())) {
             throw new BusinessException(ResultCode.SPORT_ITEM_NOT_FOUND);
         }
+        if (sportItem.getStatus() == null || sportItem.getStatus() != 1) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "该项目当前未开放报名");
+        }
+        if (sportItem.getIsRelay() != null && sportItem.getIsRelay() == 1) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "该项目为接力项目，请通过接力组队报名");
+        }
 
-        // 检查人数限制
-        if (sportItem.getMaxParticipants() != null && sportItem.getCurrentParticipants() >= sportItem.getMaxParticipants()) {
+        // Lock the student's row as well, serializing concurrent submissions across different projects
+        // so the per-event project limit cannot be exceeded by parallel requests.
+        SysUser user = sysUserService.getOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getId, userId)
+                .last("FOR UPDATE"));
+        if (user == null || user.getStatus() == null || user.getStatus() != 1
+                || !"STUDENT".equals(user.getRole())) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "仅状态正常的学生账号可以报名");
+        }
+
+        Integer genderLimit = sportItem.getGenderLimit();
+        if (genderLimit != null && genderLimit != 0 && !genderLimit.equals(user.getGender())) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED,
+                    "该项目限制" + (genderLimit == 1 ? "男" : "女") + "性参加");
+        }
+
+        LambdaQueryWrapper<Registration> sameEntryQuery = new LambdaQueryWrapper<Registration>()
+                .eq(Registration::getEventId, dto.getEventId())
+                .eq(Registration::getSportItemId, dto.getSportItemId())
+                .eq(Registration::getUserId, userId)
+                .last("FOR UPDATE");
+        Registration previous = this.getOne(sameEntryQuery, false);
+        if (previous != null && (previous.getStatus() == 1 || previous.getStatus() == 2)) {
+            throw new BusinessException(ResultCode.REGISTRATION_ALREADY_EXISTS);
+        }
+
+        long currentForItem = this.count(new LambdaQueryWrapper<Registration>()
+                .eq(Registration::getEventId, dto.getEventId())
+                .eq(Registration::getSportItemId, dto.getSportItemId())
+                .in(Registration::getStatus, 1, 2));
+        Integer itemLimit = sportItem.getMaxParticipants();
+        if (itemLimit != null && itemLimit > 0 && currentForItem >= itemLimit) {
             throw new BusinessException(ResultCode.REGISTRATION_LIMIT_EXCEEDED);
         }
 
-        // 检查性别限制 (0-不限 1-仅男 2-仅女)
-        SysUser user = sysUserService.getById(userId);
-        Integer genderLimit = sportItem.getGenderLimit();
-        if (genderLimit != null && genderLimit != 0) {
-            // 用户性别需要与限制匹配
-            if (!genderLimit.equals(user.getGender())) {
-                throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED,
-                    "该项目限制" + (genderLimit == 1 ? "男" : "女") + "性参加");
-            }
+        long currentForStudent = this.count(new LambdaQueryWrapper<Registration>()
+                .eq(Registration::getEventId, dto.getEventId())
+                .eq(Registration::getUserId, userId)
+                .in(Registration::getStatus, 1, 2));
+        Integer perStudentLimit = event.getMaxItemsPerUser();
+        if (perStudentLimit != null && perStudentLimit > 0 && currentForStudent >= perStudentLimit) {
+            throw new BusinessException("已达到本赛事每人限报项目数（" + perStudentLimit + "项）");
         }
 
-        // 创建报名记录
+        if (previous != null) {
+            // Reuse the existing row to satisfy the legacy unique key (user_id, sport_item_id, is_deleted).
+            previous.setStatus(1);
+            previous.setReviewerId(null);
+            previous.setReviewTime(null);
+            previous.setReviewRemark(null);
+            previous.setRemark(dto.getRemark());
+            this.updateById(previous);
+            updateParticipantCount(sportItem);
+            return previous.getId();
+        }
+
         Registration registration = new Registration();
         registration.setEventId(dto.getEventId());
         registration.setSportItemId(dto.getSportItemId());
         registration.setUserId(userId);
-        registration.setStatus(1);  // 1-待审核
+        registration.setStatus(1);
         registration.setRemark(dto.getRemark());
-
         this.save(registration);
-
-        // 更新项目报名人数
-        sportItem.setCurrentParticipants(sportItem.getCurrentParticipants() + 1);
-        sportItemService.updateById(sportItem);
-
+        updateParticipantCount(sportItem);
         return registration.getId();
     }
 
@@ -119,24 +157,19 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             throw new BusinessException(ResultCode.REGISTRATION_NOT_FOUND);
         }
 
-        // 只能取消自己的报名
-        if (!registration.getUserId().equals(SecurityUtils.getUserId()) && !SecurityUtils.isAdmin()) {
+        Long currentUserId = SecurityUtils.getUserId();
+        if (!registration.getUserId().equals(currentUserId) && !SecurityUtils.isAdmin()) {
             throw new BusinessException(ResultCode.FORBIDDEN);
         }
-
-        // 只能取消待审核的报名 (1-待审核)
         if (registration.getStatus() == null || registration.getStatus() != 1) {
             throw new BusinessException(ResultCode.REGISTRATION_CANNOT_CANCEL);
         }
 
-        registration.setStatus(4);  // 4-已取消
+        registration.setStatus(4);
         this.updateById(registration);
-
-        // 更新项目报名人数
-        SportItem sportItem = sportItemService.getById(registration.getSportItemId());
-        if (sportItem != null && sportItem.getCurrentParticipants() > 0) {
-            sportItem.setCurrentParticipants(sportItem.getCurrentParticipants() - 1);
-            sportItemService.updateById(sportItem);
+        SportItem item = sportItemService.getById(registration.getSportItemId());
+        if (item != null) {
+            updateParticipantCount(item);
         }
     }
 
@@ -153,39 +186,65 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             throw new BusinessException("只能审核待审核的报名");
         }
 
-        // 状态转换: APPROVED->2, REJECTED->3
-        Integer statusCode = "APPROVED".equals(status) ? 2 : ("REJECTED".equals(status) ? 3 : registration.getStatus());
+        // 状态转换: APPROVED->2, REJECTED->3。拒绝无效状态，避免静默更新。
+        Integer statusCode;
+        if ("APPROVED".equalsIgnoreCase(status)) {
+            statusCode = 2;
+        } else if ("REJECTED".equalsIgnoreCase(status)) {
+            statusCode = 3;
+        } else {
+            throw new BusinessException("不支持的报名审核状态");
+        }
         registration.setStatus(statusCode);
         registration.setReviewerId(SecurityUtils.getUserId());
         registration.setReviewTime(LocalDateTime.now());
         registration.setReviewRemark(remark);
 
         this.updateById(registration);
-
-        // 如果拒绝(3)，减少报名人数
-        if (statusCode == 3) {
-            SportItem sportItem = sportItemService.getById(registration.getSportItemId());
-            if (sportItem != null && sportItem.getCurrentParticipants() > 0) {
-                sportItem.setCurrentParticipants(sportItem.getCurrentParticipants() - 1);
-                sportItemService.updateById(sportItem);
-            }
+        SportItem sportItem = sportItemService.getById(registration.getSportItemId());
+        if (sportItem != null) {
+            updateParticipantCount(sportItem);
         }
     }
 
     @Override
-    public IPage<RegistrationVO> pageRegistrations(Integer current, Integer size, Long eventId, Long sportItemId, String status) {
+    public IPage<RegistrationVO> pageRegistrations(Integer current, Integer size, Long eventId,
+                                                   Long sportItemId, String status, String college, String className) {
         Page<Registration> page = new Page<>(current, size);
-
+        Integer statusCode = parseStatus(status);
         LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, Registration::getEventId, eventId)
                 .eq(sportItemId != null, Registration::getSportItemId, sportItemId)
-                .eq(status != null, Registration::getStatus, status)
+                .eq(statusCode != null, Registration::getStatus, statusCode)
                 .orderByDesc(Registration::getCreateTime);
 
-        IPage<Registration> registrationPage = this.page(page, wrapper);
+        if (StringUtils.hasText(college) || StringUtils.hasText(className)) {
+            LambdaQueryWrapper<SysUser> userWrapper = new LambdaQueryWrapper<SysUser>()
+                    .like(StringUtils.hasText(college), SysUser::getCollege, college)
+                    .like(StringUtils.hasText(className), SysUser::getClassName, className);
+            List<Long> matchedUserIds = sysUserService.list(userWrapper).stream()
+                    .map(SysUser::getId)
+                    .collect(Collectors.toList());
+            if (matchedUserIds.isEmpty()) {
+                Page<RegistrationVO> emptyPage = new Page<>(current, size, 0);
+                emptyPage.setRecords(List.of());
+                return emptyPage;
+            }
+            wrapper.in(Registration::getUserId, matchedUserIds);
+        }
 
-        // 使用批量转换优化N+1查询
-        return convertToVOPage(registrationPage);
+        return convertToVOPage(this.page(page, wrapper));
+    }
+
+    @Override
+    public IPage<RegistrationVO> pageMyRegistrations(Integer current, Integer size, String status) {
+        Page<Registration> page = new Page<>(current, size);
+        Integer statusCode = parseStatus(status);
+        LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Registration::getUserId, SecurityUtils.getUserId())
+                .eq(statusCode != null, Registration::getStatus, statusCode)
+                .orderByDesc(Registration::getCreateTime);
+        return convertToVOPage(this.page(page, wrapper));
     }
 
     @Override
@@ -206,7 +265,7 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
         wrapper.eq(Registration::getEventId, eventId)
                 .eq(Registration::getSportItemId, sportItemId)
                 .eq(Registration::getUserId, userId)
-                .ne(Registration::getStatus, 4);  // 4-已取消
+                .in(Registration::getStatus, 1, 2);
 
         return this.count(wrapper) > 0;
     }
@@ -270,6 +329,8 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
                 vo.setRealName(user.getRealName());
                 vo.setStudentNo(user.getStudentNo());
                 vo.setCollege(user.getCollege());
+                vo.setClassName(user.getClassName());
+                vo.setPhone(user.getPhone());
             }
 
             if (registration.getReviewerId() != null) {
@@ -279,9 +340,46 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
                 }
             }
 
+            vo.setStatus(getStatusCode(registration.getStatus()));
             vo.setStatusName(getStatusName(registration.getStatus()));
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Recalculate rather than increment/decrement a counter so retries and status transitions do not drift.
+     * The caller runs inside a transaction and holds the sport-item row lock when creating registrations.
+     */
+    private void updateParticipantCount(SportItem item) {
+        long activeCount = this.count(new LambdaQueryWrapper<Registration>()
+                .eq(Registration::getSportItemId, item.getId())
+                .in(Registration::getStatus, 1, 2));
+        item.setCurrentParticipants(Math.toIntExact(activeCount));
+        sportItemService.updateById(item);
+    }
+
+    private Integer parseStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        return switch (status.trim().toUpperCase()) {
+            case "PENDING", "1" -> 1;
+            case "APPROVED", "2" -> 2;
+            case "REJECTED", "3" -> 3;
+            case "CANCELLED", "CANCELED", "4" -> 4;
+            default -> throw new BusinessException("不支持的报名状态：" + status);
+        };
+    }
+
+    private String getStatusCode(Integer status) {
+        if (status == null) return "";
+        return switch (status) {
+            case 1 -> "PENDING";
+            case 2 -> "APPROVED";
+            case 3 -> "REJECTED";
+            case 4 -> "CANCELLED";
+            default -> String.valueOf(status);
+        };
     }
 
     private String getStatusName(Integer status) {

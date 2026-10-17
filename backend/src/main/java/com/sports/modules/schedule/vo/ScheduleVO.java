@@ -50,6 +50,11 @@ public class ScheduleVO {
     private Integer roundNo;
 
     /**
+     * Competition round type.
+     */
+    private String roundType;
+
+    /**
      * 组别
      */
     private String groupNo;

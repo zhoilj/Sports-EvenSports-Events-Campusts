@@ -3,6 +3,7 @@ package com.sports.modules.result.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.sports.modules.result.entity.CompetitionResult;
+import com.sports.modules.result.entity.ResultAuditLog;
 import com.sports.modules.result.vo.CompetitionResultVO;
 
 import java.util.List;
@@ -40,7 +41,20 @@ public interface CompetitionResultService extends IService<CompetitionResult> {
     List<CompetitionResultVO> getMyResultsVO(Long userId);
 
     /**
+     * 校验报名资格后新增或更新成绩，并重新计算当前场次名次。
+     */
+    void saveValidatedResult(CompetitionResult result);
+
+    /**
      * 批量录入成绩
      */
     void batchSaveResults(List<CompetitionResult> results);
+
+    void reviewResult(Long id, Integer status, String remark);
+
+    int publishScheduleResults(Long scheduleId);
+
+    void deleteResult(Long id);
+
+    List<ResultAuditLog> getAuditLogs(Long id);
 }

@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 报名 Controller
@@ -29,6 +30,7 @@ public class RegistrationController {
 
     @Operation(summary = "学生报名")
     @PostMapping
+    @PreAuthorize("hasRole('STUDENT')")
     public Result<Long> register(@Valid @RequestBody RegistrationDTO dto) {
         Long id = registrationService.register(dto);
         return Result.success("报名成功", id);
@@ -63,7 +65,8 @@ public class RegistrationController {
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> rejectRegistration(@PathVariable Long id,
-                                           @RequestParam(required = false) String reason) {
+                                           @RequestBody(required = false) Map<String, String> body) {
+        String reason = body == null ? null : body.get("reason");
         registrationService.reviewRegistration(id, "REJECTED", reason);
         return Result.success();
     }
@@ -76,14 +79,19 @@ public class RegistrationController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long eventId,
             @RequestParam(required = false) Long sportItemId,
-            @RequestParam(required = false) String status) {
-        return Result.success(PageResult.of(registrationService.pageRegistrations(current, size, eventId, sportItemId, status)));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String college,
+            @RequestParam(required = false) String className) {
+        return Result.success(PageResult.of(registrationService.pageRegistrations(current, size, eventId, sportItemId, status, college, className)));
     }
 
     @Operation(summary = "获取我的报名列表")
     @GetMapping("/my")
-    public Result<List<RegistrationVO>> getMyRegistrations() {
-        return Result.success(registrationService.getMyRegistrations());
+    public Result<PageResult<RegistrationVO>> getMyRegistrations(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "10") Integer size,
+            @RequestParam(required = false) String status) {
+        return Result.success(PageResult.of(registrationService.pageMyRegistrations(current, size, status)));
     }
 
     @Operation(summary = "检查是否已报名")

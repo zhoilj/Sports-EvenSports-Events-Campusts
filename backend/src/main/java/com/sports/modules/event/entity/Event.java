@@ -71,6 +71,12 @@ public class Event extends BaseEntity {
     private LocalDate regEndDate;
 
     /**
+     * 每名学生最多可报名的个人项目数；0 表示不限。
+     */
+    @TableField("max_items_per_user")
+    private Integer maxItemsPerUser;
+
+    /**
      * 举办地点
      */
     private String location;

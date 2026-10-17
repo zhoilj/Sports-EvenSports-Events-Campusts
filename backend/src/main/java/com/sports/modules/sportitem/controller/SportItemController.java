@@ -27,6 +27,7 @@ import java.util.List;
 public class SportItemController {
 
     private final SportItemService sportItemService;
+    private final com.sports.modules.event.service.EventService eventService;
 
     @Operation(summary = "分页查询运动项目")
     @GetMapping
@@ -60,12 +61,20 @@ public class SportItemController {
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Long> create(@Valid @RequestBody SportItem sportItem) {
         // 设置默认值
-        if (sportItem.getStatus() == null) {
-            sportItem.setStatus(1);
-        }
-        if (sportItem.getCurrentParticipants() == null) {
-            sportItem.setCurrentParticipants(0);
-        }
+        if (sportItem.getStatus() == null) sportItem.setStatus(1);
+        if (sportItem.getCurrentParticipants() == null) sportItem.setCurrentParticipants(0);
+        if (sportItem.getIsTeamEvent() == null) sportItem.setIsTeamEvent(Integer.valueOf(1).equals(sportItem.getIsRelay()) ? 1 : 0);
+        if (sportItem.getTeamMemberCount() == null) sportItem.setTeamMemberCount(0);
+        if (sportItem.getTeamReserveCount() == null) sportItem.setTeamReserveCount(0);
+        if (sportItem.getMaxTeamsPerCollege() == null) sportItem.setMaxTeamsPerCollege(1);
+        if (sportItem.getTeamRosterRule() == null) sportItem.setTeamRosterRule("ANY");
+        if (sportItem.getDivision() == null) sportItem.setDivision("OPEN");
+        if (sportItem.getGenderCategory() == null) sportItem.setGenderCategory("OPEN");
+        if (sportItem.getRoundPolicy() == null) sportItem.setRoundPolicy("FINAL_ONLY");
+        if (sportItem.getScoringMultiplier() == null) sportItem.setScoringMultiplier(
+                Integer.valueOf(1).equals(sportItem.getIsRelay()) ? 2 : 1);
+        if (sportItem.getParticipationPoints() == null) sportItem.setParticipationPoints(0);
+        if (sportItem.getRecordPoints() == null) sportItem.setRecordPoints(9);
         sportItemService.save(sportItem);
         return Result.success(sportItem.getId());
     }
@@ -81,6 +90,104 @@ public class SportItemController {
         sportItem.setId(id);
         sportItemService.updateById(sportItem);
         return Result.success();
+    }
+
+    @Operation(summary = "按正式秩序册匹配项目默认规则")
+    @PostMapping("/event/{eventId}/apply-orderbook-defaults")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Integer> applyOrderBookDefaults(@PathVariable Long eventId) {
+        if (eventService.getById(eventId) == null) throw new BusinessException(ResultCode.EVENT_NOT_FOUND);
+        List<SportItem> items = sportItemService.getByEventId(eventId);
+        if (items == null || items.isEmpty()) throw new BusinessException("该赛事尚未创建比赛项目");
+        int updated = 0;
+        for (SportItem item : items) {
+            String name = item.getName() == null ? "" : item.getName().replaceAll("\\s", "");
+            boolean groupEvent = containsAny(name, "集体", "民体", "趣味", "拔河", "跳长绳", "两人三足",
+                    "三人板鞋", "抛绣球", "高杆绣球", "背篓接绣球", "背篓投绣球", "背篓", "校园越野跑", "车轮滚滚", "旱地龙舟",
+                    "袋鼠跳", "滚铁环", "企鹅漫步", "协同大转盘", "竞步跑");
+            boolean mixedRelay = name.contains("混合接力") || name.contains("混合");
+            item.setDivision(name.contains("甲组") ? "A" : name.contains("乙组") ? "B"
+                    : name.contains("教工组") ? "STAFF" : "OPEN");
+            boolean teamEvent = Integer.valueOf(1).equals(item.getIsRelay()) || groupEvent;
+            item.setIsTeamEvent(teamEvent ? 1 : 0);
+            if (teamEvent && !Integer.valueOf(1).equals(item.getIsRelay()) && item.getTeamMemberCount() == null) {
+                item.setTeamMemberCount(defaultTeamMemberCount(name));
+            }
+            if (teamEvent && !Integer.valueOf(1).equals(item.getIsRelay())
+                    && (item.getTeamMemberCount() == null || item.getTeamMemberCount() == 0)) {
+                item.setTeamMemberCount(defaultTeamMemberCount(name));
+            }
+            if (item.getTeamReserveCount() == null) item.setTeamReserveCount(0);
+            item.setMaxTeamsPerCollege(defaultMaxTeamsPerCollege(name));
+            item.setTeamRosterRule(defaultTeamRosterRule(name, Integer.valueOf(1).equals(item.getIsRelay())));
+            item.setGenderCategory(mixedRelay ? "MIXED" : name.contains("男子") ? "MALE"
+                    : name.contains("女子") ? "FEMALE" : Integer.valueOf(1).equals(item.getGenderLimit()) ? "MALE"
+                    : Integer.valueOf(2).equals(item.getGenderLimit()) ? "FEMALE" : "OPEN");
+            boolean prelimFinal = !mixedRelay && !groupEvent && "TRACK".equalsIgnoreCase(item.getType())
+                    && (name.contains("100米") || name.contains("200米")
+                    || name.matches(".*4[×xX]100米接力.*"));
+            item.setRoundPolicy(prelimFinal ? "PRELIMINARY_FINAL" : "FINAL_ONLY");
+            boolean participationEvent = name.contains("趣味") || name.contains("车轮滚滚")
+                    || name.contains("旱地龙舟") || name.contains("袋鼠跳") || name.contains("滚铁环")
+                    || name.contains("企鹅漫步") || name.contains("协同大转盘")
+                    || name.contains("集体跳长绳");
+            item.setScoringMultiplier(Integer.valueOf(1).equals(item.getIsRelay()) || groupEvent ? 2 : 1);
+            item.setParticipationPoints(participationEvent ? 3 : 0);
+            item.setRecordPoints(9);
+            sportItemService.updateById(item);
+            updated++;
+        }
+        return Result.success("已匹配默认规则，请逐项对照秩序册复核", updated);
+    }
+
+    private String defaultTeamRosterRule(String name, boolean relay) {
+        if (relay && (name.contains("混合接力") || name.contains("混合"))) return "MIXED_RELAY_LEGS";
+        if (relay && name.contains("男子")) return "MALE_ONLY";
+        if (relay && name.contains("女子")) return "FEMALE_ONLY";
+        if (name.contains("校园越野跑")) return "CUSTOM";
+        if (name.contains("和谐共进")) return "MIXED_5M5F";
+        if (name.contains("两人三足")) return "PAIRS_1M1F";
+        if (name.contains("拔河") || name.contains("集体跳长绳") || name.contains("袋鼠跳")) return "MIXED_10M10F";
+        if (name.contains("车轮滚滚") || name.contains("旱地龙舟")
+                || name.contains("滚铁环") || name.contains("企鹅漫步")) return "MIXED_5M5F";
+        if (name.contains("协同大转盘")) return "MIXED_15M15F";
+        if (name.contains("三人板鞋")) return "MIXED_MIN_6F";
+        if (name.contains("背篓")) return "MIXED_2M2F_MIN";
+        if (name.contains("高杆绣球")) return "MIXED_3M3F";
+        if (name.contains("抛绣球")) return "CUSTOM";
+        return "ANY";
+    }
+
+    private int defaultTeamMemberCount(String name) {
+        if (name.contains("校园越野跑")) return 10;
+        if (name.contains("和谐共进")) return 10;
+        if (name.contains("两人三足")) return 20;
+        if (name.contains("拔河")) return 20;
+        if (name.contains("集体跳长绳")) return 20;
+        if (name.contains("车轮滚滚")) return 10;
+        if (name.contains("旱地龙舟")) return 10;
+        if (name.contains("袋鼠跳")) return 20;
+        if (name.contains("滚铁环")) return 10;
+        if (name.contains("企鹅漫步")) return 10;
+        if (name.contains("协同大转盘")) return 30;
+        if (name.contains("三人板鞋")) return 18;
+        if (name.contains("背篓")) return 5;
+        if (name.contains("高杆绣球")) return 6;
+        if (name.contains("抛绣球")) return 0;
+        return 0;
+    }
+
+    private int defaultMaxTeamsPerCollege(String name) {
+        if (name.contains("三人板鞋") || name.contains("高杆绣球")
+                || name.contains("背篓") || name.contains("抛绣球")) return 2;
+        return 1;
+    }
+
+    private boolean containsAny(String value, String... keywords) {
+        for (String keyword : keywords) {
+            if (value.contains(keyword)) return true;
+        }
+        return false;
     }
 
     @Operation(summary = "删除运动项目")

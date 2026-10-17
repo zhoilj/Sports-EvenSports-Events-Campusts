@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * 赛程 Service 实现
@@ -83,6 +85,118 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     }
 
     @Override
+    public void validateSchedule(Schedule schedule, Long excludeId) {
+        if (schedule == null || schedule.getEventId() == null || schedule.getSportItemId() == null) {
+            throw new BusinessException("赛事和比赛项目不能为空");
+        }
+        if (schedule.getMatchDate() == null || schedule.getStartTime() == null) {
+            throw new BusinessException("比赛日期和开始时间不能为空");
+        }
+        if (schedule.getEndTime() != null && !schedule.getEndTime().isAfter(schedule.getStartTime())) {
+            throw new BusinessException("结束时间必须晚于开始时间");
+        }
+
+        Event event = eventService.getById(schedule.getEventId());
+        if (event == null) {
+            throw new BusinessException(ResultCode.EVENT_NOT_FOUND);
+        }
+        if (event.getStartDate() != null && schedule.getMatchDate().isBefore(event.getStartDate())
+                || event.getEndDate() != null && schedule.getMatchDate().isAfter(event.getEndDate())) {
+            throw new BusinessException("比赛日期必须位于赛事开始和结束日期之间");
+        }
+
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        if (item == null || !java.util.Objects.equals(item.getEventId(), schedule.getEventId())) {
+            throw new BusinessException("所选比赛项目不属于当前赛事");
+        }
+
+        String roundType = schedule.getRoundType();
+        if (roundType != null && !java.util.Set.of("PRELIMINARY", "SEMIFINAL", "FINAL", "FIELD_FINAL").contains(roundType)) {
+            throw new BusinessException("比赛轮次类型无效");
+        }
+        validateRoundConfiguration(schedule);
+        String roundPolicy = item.getRoundPolicy() == null ? "FLEXIBLE" : item.getRoundPolicy();
+        if ("FINAL_ONLY".equalsIgnoreCase(roundPolicy)
+                && !java.util.Set.of("FINAL", "FIELD_FINAL").contains(roundType)) {
+            throw new BusinessException("该项目按秩序册只进行决赛，不能创建预赛或半决赛");
+        }
+        if ("PRELIMINARY_FINAL".equalsIgnoreCase(roundPolicy)
+                && !java.util.Set.of("PRELIMINARY", "FINAL").contains(roundType)) {
+            throw new BusinessException("该项目按秩序册只允许预赛和决赛，不设置半决赛或田赛轮次");
+        }
+        if ("FIELD".equalsIgnoreCase(item.getType())
+                && java.util.Set.of("PRELIMINARY", "SEMIFINAL").contains(roundType)) {
+            throw new BusinessException("田赛项目按秩序册直接进行决赛");
+        }
+        if (schedule.getQualificationCount() != null && schedule.getQualificationCount() < 1) {
+            throw new BusinessException("晋级人数必须为正整数");
+        }
+        if (schedule.getAwardCount() != null && schedule.getAwardCount() < 1) {
+            throw new BusinessException("录取名次数量必须为正整数");
+        }
+
+        java.time.LocalTime proposedEnd = effectiveEnd(schedule, item);
+        List<Schedule> sameDay = this.list(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getMatchDate, schedule.getMatchDate())
+                .ne(excludeId != null, Schedule::getId, excludeId)
+                .ne(Schedule::getStatus, 4));
+        for (Schedule existing : sameDay) {
+            if (!StringUtils.hasText(schedule.getLocation()) || !StringUtils.hasText(existing.getLocation())
+                    || !schedule.getLocation().trim().equalsIgnoreCase(existing.getLocation().trim())) {
+                continue;
+            }
+            SportItem existingItem = sportItemService.getById(existing.getSportItemId());
+            if (!sameCompetitionArea(item, existingItem)) continue;
+            java.time.LocalTime existingEnd = effectiveEnd(existing, existingItem);
+            boolean overlaps = schedule.getStartTime().isBefore(existingEnd)
+                    && existing.getStartTime().isBefore(proposedEnd);
+            if (overlaps) {
+                throw new BusinessException("场地/项目区时间冲突：场地“" + schedule.getLocation() + "”在"
+                        + existing.getStartTime() + "—" + existingEnd + "已有赛程“"
+                        + existing.getScheduleName() + "”（赛程ID " + existing.getId() + "）");
+            }
+        }
+    }
+
+    private void validateRoundConfiguration(Schedule schedule) {
+        String roundType = schedule.getRoundType() == null ? "FINAL" : schedule.getRoundType();
+        if (java.util.Set.of("PRELIMINARY", "SEMIFINAL").contains(roundType)
+                && (schedule.getQualificationCount() == null || schedule.getQualificationCount() < 1)) {
+            throw new BusinessException("预赛/半决赛必须按秩序册配置晋级人数后才能保存或开始");
+        }
+        if (java.util.Set.of("FINAL", "FIELD_FINAL").contains(roundType)
+                && (schedule.getAwardCount() == null || schedule.getAwardCount() < 1)) {
+            throw new BusinessException("决赛/田赛决赛必须按秩序册配置录取名次后才能保存或开始");
+        }
+    }
+
+    private java.time.LocalTime effectiveEnd(Schedule schedule, SportItem item) {
+        if (schedule.getEndTime() != null) return schedule.getEndTime();
+        int minutes = 30;
+        if (item != null && "TRACK".equalsIgnoreCase(item.getType())) minutes = 5;
+        else if (item != null && "FIELD".equalsIgnoreCase(item.getType())) minutes = 90;
+        return schedule.getStartTime().plusMinutes(minutes);
+    }
+
+    private boolean sameCompetitionArea(SportItem left, SportItem right) {
+        if (left == null || right == null) return true;
+        String leftType = left.getType() == null ? "OTHER" : left.getType().toUpperCase();
+        String rightType = right.getType() == null ? "OTHER" : right.getType().toUpperCase();
+        if (!leftType.equals(rightType)) return false;
+        if ("TRACK".equals(leftType)) return true;
+        if ("FIELD".equals(leftType)) {
+            return fieldAreaKey(left).equals(fieldAreaKey(right));
+        }
+        return true; // Other events sharing the same configured location share one competition area.
+    }
+
+    private String fieldAreaKey(SportItem item) {
+        String name = item.getName() == null ? "" : item.getName();
+        String project = name.replaceAll("甲组|乙组|教工组|男子|女子|混合|决赛|预赛|田赛|\\s", "");
+        return project;
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void startMatch(Long id) {
         Schedule schedule = this.getById(id);
@@ -92,6 +206,9 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (!STATUS_PENDING.equals(schedule.getStatus())) {
             throw new BusinessException(ResultCode.BAD_REQUEST);
         }
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        if (item == null) throw new BusinessException("比赛项目不存在");
+        validateRoundConfiguration(schedule);
         schedule.setStatus(STATUS_ONGOING);
         this.updateById(schedule);
     }

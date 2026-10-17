@@ -55,6 +55,20 @@ public class Schedule extends BaseEntity {
     private Integer roundNo;
 
     /**
+     * PRELIMINARY / SEMIFINAL / FINAL / FIELD_FINAL
+     */
+    @TableField("round_type")
+    private String roundType;
+
+    /** Total number of qualifiers to advance from this round. */
+    @TableField("qualification_count")
+    private Integer qualificationCount;
+
+    /** Number of places eligible for placement points in a final. */
+    @TableField("award_count")
+    private Integer awardCount;
+
+    /**
      * 组别（如: A组/B组）
      */
     @TableField("group_no")

@@ -31,8 +31,8 @@
           </template>
         </el-table-column>
         <el-table-column prop="createTime" label="报名时间" width="160" />
-        <el-table-column prop="auditTime" label="审核时间" width="160" />
-        <el-table-column prop="auditRemark" label="审核意见" min-width="150" />
+        <el-table-column prop="reviewTime" label="审核时间" width="160" />
+        <el-table-column prop="reviewRemark" label="审核意见" min-width="150" />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleViewEvent(row)">查看赛事</el-button>
@@ -102,8 +102,8 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',

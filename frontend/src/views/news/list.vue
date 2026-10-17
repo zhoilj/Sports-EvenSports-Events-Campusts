@@ -202,8 +202,8 @@ function resetQuery() {
   loadData()
 }
 
-function getTypeTagType(type: string) {
-  const map: Record<string, string> = {
+function getTypeTagType(type: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     ANNOUNCEMENT: 'danger',
     NEWS: 'primary',
     NOTICE: 'warning'
@@ -211,8 +211,8 @@ function getTypeTagType(type: string) {
   return map[type] || 'info'
 }
 
-function getStatusType(status: number) {
-  const map: Record<number, string> = {
+function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     0: 'info',      // 草稿
     1: 'success',   // 已发布
     2: 'warning'    // 已下架
