@@ -35,6 +35,12 @@
         <el-table-column prop="roundType" label="轮次类型" width="110">
           <template #default="{ row }">{{ roundTypeName(row.roundType) }}</template>
         </el-table-column>
+        <el-table-column prop="qualificationCount" label="晋级人数" width="90">
+          <template #default="{ row }">{{ row.qualificationCount ?? '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="awardCount" label="录取名次" width="90">
+          <template #default="{ row }">{{ row.awardCount ?? '—' }}</template>
+        </el-table-column>
         <el-table-column prop="groupNo" label="分组" width="80" />
         <el-table-column prop="matchDate" label="比赛日期" width="120" />
         <el-table-column prop="startTime" label="开始时间" width="100" />
