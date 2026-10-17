@@ -9,9 +9,9 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
-    username: root
-    password: root
+    url: ${DB_URL:jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     druid:
       initial-size: 5
       min-idle: 5
@@ -41,6 +41,11 @@ spring:
       max-file-size: 10MB
       max-request-size: 100MB
 
+  # SQL initialization scripts are deliberately disabled; use reviewed migrations instead.
+  sql:
+    init:
+      mode: never
+
 # MyBatis-Plus配置
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
@@ -58,7 +63,7 @@ mybatis-plus:
 
 # JWT配置
 jwt:
-  secret: SportEventsSecretKey2024SportEventsSecretKey2024SportEventsSecretKey2024
+  secret: ${JWT_SECRET}
   expiration: 86400000  # 24小时
   header: Authorization
   prefix: "Bearer "
