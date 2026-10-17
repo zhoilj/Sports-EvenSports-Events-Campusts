@@ -100,7 +100,7 @@
               :value="member.userId"
             />
           </el-select>
-          <div class="form-tip">系统会自动加入当前账号作为队长。请只选择其他队员；队员必须来自同一学院，乙组队伍还须属于同一年级/专业班级。</div>
+          <div class="form-tip">系统会自动加入当前账号作为队长。请只选择其他队员；队员必须来自同一学院；若集体项目混合甲乙组学生，系统将按体育专业班级归入乙组，乙组成员须归属同一体育专业班级。</div>
         </el-form-item>
       </el-form>
       <template #footer>
