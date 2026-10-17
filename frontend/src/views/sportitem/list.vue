@@ -18,7 +18,9 @@
       </div>
 
       <el-alert class="group-alert" type="info" :closable="false" show-icon>
-        **甲组：普通本科组**；**乙组：体育专业组**。组别由管理员依据学籍信息核定，报名、接力队伍、赛程和成绩均按组别隔离。
+        <template #default>
+          <strong>甲组：普通本科组</strong>；<strong>乙组：体育专业组</strong>。组别由管理员依据学籍信息核定，报名、接力队伍、赛程和成绩均按组别隔离。
+        </template>
       </el-alert>
 
       <el-form :inline="true" :model="queryParams" class="search-form" @submit.prevent>
