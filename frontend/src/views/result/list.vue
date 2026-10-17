@@ -210,13 +210,6 @@ async function loadEventOptions() {
   }
 }
 
-async function loadSportItemOptions(eventId: number) {
-  const res = await get('/sport-items', { eventId, size: 100 })
-  if (res.code === 200) {
-    sportItemOptions.value = res.data.records || []
-  }
-}
-
 async function loadData() {
   loading.value = true
   try {
@@ -253,8 +246,10 @@ function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑成绩'
   Object.assign(formData, row)
-  onEventChange(row.eventId)
-  onSportItemChange(row.sportItemId)
+  await onEventChange(row.eventId)
+  formData.sportItemId = row.sportItemId
+  await onSportItemChange(row.sportItemId)
+  formData.registrationId = row.registrationId
   dialogVisible.value = true
 }
 
@@ -273,7 +268,7 @@ async function onEventChange(eventId: number) {
 }
 
 async function onSportItemChange(sportItemId: number) {
-  formData.userId = null
+  formData.registrationId = null
   if (sportItemId) {
     // 获取该项目已通过审核的报名人员
     const res = await get('/registrations', { eventId: formData.eventId, sportItemId, status: 'APPROVED', size: 100 })
