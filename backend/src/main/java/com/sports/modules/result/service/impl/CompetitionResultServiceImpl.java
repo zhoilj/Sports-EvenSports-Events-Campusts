@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.sports.modules.event.entity.Event;
 import com.sports.modules.event.service.EventService;
 import com.sports.modules.result.entity.CompetitionResult;
+import com.sports.modules.registration.entity.Registration;
+import com.sports.modules.registration.service.RegistrationService;
+import com.sports.common.exception.BusinessException;
 import com.sports.modules.result.mapper.CompetitionResultMapper;
 import com.sports.modules.result.service.CompetitionResultService;
 import com.sports.modules.result.vo.CompetitionResultVO;
@@ -20,6 +23,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,6 +42,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     private final EventService eventService;
     private final SportItemService sportItemService;
     private final SysUserService sysUserService;
+    private final RegistrationService registrationService;
 
     @Override
     public IPage<CompetitionResult> pageResults(Integer current, Integer size, Long eventId, Long sportItemId, Long userId) {
@@ -85,11 +91,80 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void batchSaveResults(List<CompetitionResult> results) {
-        Long recorderId = SecurityUtils.getUserId();
         for (CompetitionResult result : results) {
-            result.setRecorderId(recorderId);
+            prepareAndValidateResult(result);
         }
         this.saveBatch(results);
+        recalculateRankings(results.get(0).getEventId(), results.get(0).getSportItemId());
+    }
+
+    /**
+     * Validates that every score belongs to an approved registration for the same event/item.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveValidatedResult(CompetitionResult result) {
+        prepareAndValidateResult(result);
+        this.saveOrUpdate(result);
+        recalculateRankings(result.getEventId(), result.getSportItemId());
+    }
+
+    private void prepareAndValidateResult(CompetitionResult result) {
+        if (result.getRegistrationId() == null) {
+            throw new BusinessException("成绩必须关联报名记录");
+        }
+        Registration registration = registrationService.getById(result.getRegistrationId());
+        if (registration == null || registration.getStatus() == null || registration.getStatus() != 2) {
+            throw new BusinessException("只能为已审核通过的报名录入成绩");
+        }
+        if (!registration.getEventId().equals(result.getEventId())
+                || !registration.getSportItemId().equals(result.getSportItemId())) {
+            throw new BusinessException("成绩所属赛事或项目与报名记录不一致");
+        }
+        if (result.getUserId() != null && !result.getUserId().equals(registration.getUserId())) {
+            throw new BusinessException("成绩参赛者与报名记录不一致");
+        }
+        result.setUserId(registration.getUserId());
+        result.setRecorderId(SecurityUtils.getUserId());
+        result.setRecordTime(LocalDateTime.now());
+    }
+
+    /**
+     * Recalculate places according to the item's configured result type.
+     * Track times sort ascending; distance/score sort descending.
+     * Equal scores share a place (1, 1, 3).
+     */
+    private void recalculateRankings(Long eventId, Long sportItemId) {
+        if (eventId == null || sportItemId == null) {
+            return;
+        }
+        com.sports.modules.sportitem.entity.SportItem item = sportItemService.getById(sportItemId);
+        if (item == null) {
+            return;
+        }
+        boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType())
+                || "ASC".equalsIgnoreCase(item.getRules());
+        List<CompetitionResult> ranked = this.list(new LambdaQueryWrapper<CompetitionResult>()
+                .eq(CompetitionResult::getEventId, eventId)
+                .eq(CompetitionResult::getSportItemId, sportItemId)
+                .isNotNull(CompetitionResult::getScore));
+        Comparator<CompetitionResult> comparator = Comparator.comparing(CompetitionResult::getScore);
+        if (!ascending) {
+            comparator = comparator.reversed();
+        }
+        ranked.sort(comparator);
+        Integer previousRank = null;
+        java.math.BigDecimal previousScore = null;
+        for (int i = 0; i < ranked.size(); i++) {
+            CompetitionResult current = ranked.get(i);
+            if (previousScore != null && current.getScore().compareTo(previousScore) == 0) {
+                current.setRanking(previousRank);
+            } else {
+                current.setRanking(i + 1);
+                previousRank = i + 1;
+                previousScore = current.getScore();
+            }
+        }
+        this.updateBatchById(ranked);
     }
 
     /**
@@ -134,6 +209,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         return results.stream().map(result -> {
             CompetitionResultVO vo = new CompetitionResultVO();
             BeanUtils.copyProperties(result, vo);
+            vo.setUnit(result.getScoreText());
 
             Event event = eventMap.get(result.getEventId());
             if (event != null) {
