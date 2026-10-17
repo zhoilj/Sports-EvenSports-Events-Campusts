@@ -107,6 +107,10 @@ public class SportItem extends BaseEntity {
     @TableField("record_points")
     private Integer recordPoints;
 
+    /** Rule for checking the formal roster gender composition. */
+    @TableField("team_roster_rule")
+    private String teamRosterRule;
+
     /**
      * 最大报名人数
      */
