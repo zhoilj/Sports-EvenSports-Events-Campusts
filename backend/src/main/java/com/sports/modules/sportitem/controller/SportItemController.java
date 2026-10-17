@@ -47,10 +47,11 @@ public class SportItemController {
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long eventId,
+            @RequestParam(required = false) String name,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String competitionGroup) {
-        return Result.success(sportItemService.pageItems(current, size, eventId, type, status, competitionGroup));
+        return Result.success(sportItemService.pageItems(current, size, eventId, name, type, status, competitionGroup));
     }
 
     @Operation(summary = "按学校秩序册导入甲乙组田径项目")
