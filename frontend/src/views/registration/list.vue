@@ -73,7 +73,7 @@
         <el-descriptions-item label="参赛方式">{{ currentRow.registrationType === 'RELAY' ? '接力' : '个人' }}</el-descriptions-item>
         <el-descriptions-item label="队伍名称">{{ currentRow.teamName || '—' }}</el-descriptions-item>
         <el-descriptions-item label="接力队员" :span="2">
-          <span v-if="currentRow.members?.length">{{ currentRow.members.map((member) => member.memberOrder + '. ' + member.realName + '（' + member.studentNo + '）').join('、') }}</span>
+          <span v-if="currentRow.members?.length">{{ formatMemberRoster(currentRow.members) }}</span>
           <span v-else>—</span>
         </el-descriptions-item>
         <el-descriptions-item label="报名人">{{ currentRow.realName }}</el-descriptions-item>
@@ -168,14 +168,20 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
+  const map: Record<string, 'warning' | 'success' | 'danger' | 'info'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',
     CANCELLED: 'info'
   }
   return map[status] || 'info'
+}
+
+function formatMemberRoster(members: any[] = []): string {
+  return members.map((member: any) =>
+    `${member.memberOrder}. ${member.realName}（${member.studentNo}）`
+  ).join('、')
 }
 
 function handleView(row: any) {

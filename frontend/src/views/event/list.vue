@@ -16,10 +16,10 @@
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="queryParams.status" placeholder="请选择" clearable>
-            <el-option label="草稿" value="DRAFT" />
-            <el-option label="已发布" value="PUBLISHED" />
-            <el-option label="进行中" value="ONGOING" />
-            <el-option label="已结束" value="ENDED" />
+            <el-option label="草稿"  :value="1" />
+            <el-option label="已发布"  :value="2" />
+            <el-option label="进行中"  :value="3" />
+            <el-option label="已结束"  :value="4" />
             <el-option label="已取消" value="CANCELLED" />
           </el-select>
         </el-form-item>
@@ -54,9 +54,9 @@
           <template #default="{ row }">
             <el-button type="primary" link @click="handleView(row)">查看</el-button>
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="row.status === 'DRAFT'" type="success" link @click="handlePublish(row)">发布</el-button>
-            <el-button v-if="row.status !== 'ENDED' && row.status !== 'CANCELLED'" type="danger" link @click="handleCancel(row)">取消</el-button>
-            <el-button v-if="row.status === 'DRAFT' || row.status === 'CANCELLED'" type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="Number(row.status) === 1" type="success" link @click="handlePublish(row)">发布</el-button>
+            <el-button v-if="Number(row.status) !== 4" type="danger" link @click="handleCancel(row)">取消</el-button>
+            <el-button v-if="Number(row.status) === 1 || row.status === 'CANCELLED'" type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -138,7 +138,7 @@ const queryParams = reactive({
   size: 10,
   name: '',
   type: '',
-  status: ''
+  status: null as number | null
 })
 
 const dialogVisible = ref(false)
@@ -189,20 +189,19 @@ async function loadData() {
 function resetQuery() {
   queryParams.name = ''
   queryParams.type = ''
-  queryParams.status = ''
+  queryParams.status = null
   queryParams.current = 1
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    DRAFT: 'info',
-    PUBLISHED: 'primary',
-    ONGOING: 'success',
-    ENDED: 'warning',
-    CANCELLED: 'danger'
+function getStatusType(status: string | number): 'info' | 'primary' | 'success' | 'warning' {
+  const map: Record<string, 'info' | 'primary' | 'success' | 'warning'> = {
+    '1': 'info',
+    '2': 'primary',
+    '3': 'success',
+    '4': 'warning'
   }
-  return map[status] || 'info'
+  return map[String(status)] || 'info'
 }
 
 function handleAdd() {
