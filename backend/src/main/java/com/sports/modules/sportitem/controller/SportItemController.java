@@ -103,7 +103,7 @@ public class SportItemController {
         for (SportItem item : items) {
             String name = item.getName() == null ? "" : item.getName().replaceAll("\\s", "");
             boolean groupEvent = containsAny(name, "集体", "民体", "趣味", "拔河", "跳长绳", "两人三足",
-                    "三人板鞋", "抛绣球", "背篓接绣球", "校园越野跑", "车轮滚滚", "旱地龙舟",
+                    "三人板鞋", "抛绣球", "高杆绣球", "背篓接绣球", "背篓投绣球", "背篓", "校园越野跑", "车轮滚滚", "旱地龙舟",
                     "袋鼠跳", "滚铁环", "企鹅漫步", "协同大转盘", "竞步跑");
             boolean mixedRelay = name.contains("混合接力") || name.contains("混合");
             item.setDivision(name.contains("甲组") ? "A" : name.contains("乙组") ? "B"
@@ -146,13 +146,15 @@ public class SportItemController {
         if (relay && name.contains("女子")) return "FEMALE_ONLY";
         if (name.contains("校园越野跑")) return "CUSTOM";
         if (name.contains("和谐共进")) return "MIXED_5M5F";
-        if (name.contains("两人三足") || name.contains("拔河") || name.contains("集体跳长绳")
-                || name.contains("袋鼠跳")) return "MIXED_10M10F";
+        if (name.contains("两人三足")) return "PAIRS_1M1F";
+        if (name.contains("拔河") || name.contains("集体跳长绳") || name.contains("袋鼠跳")) return "MIXED_10M10F";
         if (name.contains("车轮滚滚") || name.contains("旱地龙舟")
                 || name.contains("滚铁环") || name.contains("企鹅漫步")) return "MIXED_5M5F";
         if (name.contains("协同大转盘")) return "MIXED_15M15F";
         if (name.contains("三人板鞋")) return "MIXED_MIN_6F";
-        if (name.contains("高杆绣球") || name.contains("背篓接绣球") || name.contains("抛绣球")) return "MIXED_3M3F";
+        if (name.contains("背篓")) return "MIXED_2M2F_MIN";
+        if (name.contains("高杆绣球")) return "MIXED_3M3F";
+        if (name.contains("抛绣球")) return "CUSTOM";
         return "ANY";
     }
 
@@ -169,13 +171,15 @@ public class SportItemController {
         if (name.contains("企鹅漫步")) return 10;
         if (name.contains("协同大转盘")) return 30;
         if (name.contains("三人板鞋")) return 18;
-        if (name.contains("高杆绣球") || name.contains("背篓接绣球") || name.contains("抛绣球")) return 6;
+        if (name.contains("背篓")) return 5;
+        if (name.contains("高杆绣球")) return 6;
+        if (name.contains("抛绣球")) return 0;
         return 0;
     }
 
     private int defaultMaxTeamsPerCollege(String name) {
         if (name.contains("三人板鞋") || name.contains("高杆绣球")
-                || name.contains("背篓接绣球") || name.contains("抛绣球")) return 2;
+                || name.contains("背篓") || name.contains("抛绣球")) return 2;
         return 1;
     }
 
