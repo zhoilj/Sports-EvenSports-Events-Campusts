@@ -48,6 +48,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
 
     private static final int SCHEDULE_PENDING = 1;
     private static final int SCHEDULE_COMPLETED = 3;
+    private static final int SCHEDULE_CANCELLED = 4;
     private static final Set<String> CHECKIN_STATUSES =
             Set.of("CHECKED_IN", "ABSENT", "WITHDRAWN", "DQ");
 
@@ -113,7 +114,12 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int autoAssign(Long scheduleId, Integer laneCount) {
-        Schedule schedule = requireSchedule(scheduleId);
+        Schedule schedule = scheduleService.getOne(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getId, scheduleId)
+                .last("FOR UPDATE"));
+        if (schedule == null) {
+            throw new BusinessException("未找到对应的赛程");
+        }
         if (!Objects.equals(schedule.getStatus(), SCHEDULE_PENDING)) {
             throw new BusinessException("仅未开始的场次可以进行编排");
         }
@@ -217,7 +223,29 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
                 throw new BusinessException("径赛跑道号应为1至12");
             }
         }
-        entry.setGroupNo(StringUtils.hasText(dto.getGroupNo()) ? dto.getGroupNo().trim() : entry.getGroupNo());
+        String groupNo = StringUtils.hasText(dto.getGroupNo()) ? dto.getGroupNo().trim() : entry.getGroupNo();
+        if (!StringUtils.hasText(groupNo)) {
+            throw new BusinessException("组别不能为空");
+        }
+        long duplicateOrder = this.count(new LambdaQueryWrapper<ScheduleEntry>()
+                .eq(ScheduleEntry::getScheduleId, entry.getScheduleId())
+                .eq(ScheduleEntry::getGroupNo, groupNo)
+                .eq(ScheduleEntry::getStartOrder, dto.getStartOrder())
+                .ne(ScheduleEntry::getId, id));
+        if (duplicateOrder > 0) {
+            throw new BusinessException("同一组别的出场顺序不能重复");
+        }
+        if (item != null && "TRACK".equalsIgnoreCase(item.getType())) {
+            long duplicateLane = this.count(new LambdaQueryWrapper<ScheduleEntry>()
+                    .eq(ScheduleEntry::getScheduleId, entry.getScheduleId())
+                    .eq(ScheduleEntry::getGroupNo, groupNo)
+                    .eq(ScheduleEntry::getLaneNo, dto.getLaneNo())
+                    .ne(ScheduleEntry::getId, id));
+            if (duplicateLane > 0) {
+                throw new BusinessException("该组别的跑道已分配给其他参赛者");
+            }
+        }
+        entry.setGroupNo(groupNo);
         entry.setLaneNo(dto.getLaneNo());
         entry.setStartOrder(dto.getStartOrder());
         this.updateById(entry);
@@ -234,8 +262,9 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             throw new BusinessException("未找到对应的参赛编排记录");
         }
         Schedule schedule = requireSchedule(entry.getScheduleId());
-        if (Objects.equals(schedule.getStatus(), SCHEDULE_COMPLETED)) {
-            throw new BusinessException("比赛已结束，不能修改检录状态");
+        if (Objects.equals(schedule.getStatus(), SCHEDULE_COMPLETED)
+                || Objects.equals(schedule.getStatus(), SCHEDULE_CANCELLED)) {
+            throw new BusinessException("比赛已结束或已取消，不能修改检录状态");
         }
         String status = normalizeCheckinStatus(dto.getStatus());
         CheckinRecord record = checkinRecordMapper.selectOne(new LambdaQueryWrapper<CheckinRecord>()
