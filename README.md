@@ -81,8 +81,9 @@ $env:JWT_SECRET = 'replace-with-a-random-secret-at-least-32-bytes-long'
 
 1. `backend/src/main/resources/db/migration/V1__campus_track_meet_additive.sql`：新增接力队伍/队员、场次参赛名单、检录、田赛试跳试投、积分规则和成绩审计表。
 2. `backend/src/main/resources/db/migration/V2__registration_compatibility_and_relay_config.sql`：兼容补齐 `sport_item.current_participants`，并新增赛事每人限报项目数、接力项目标识、正式队员数和替补人数配置。
+3. `backend/src/main/resources/db/migration/V3__competition_operations.sql`：增加赛程轮次类型、接力成绩关联、成绩状态、复核与正式发布字段；将成绩唯一约束调整为按场次区分，支持同一参赛者参加预赛和决赛。
 
-执行前请先备份数据库，并确认当前数据库已包含 `event`、`sport_item`、`registration`、`schedule`、`result` 和 `sys_user` 等基础表。V2 会检查字段是否存在，避免重复添加列。**不要在已有业务数据库上重新执行 `docs/04-DB/schema.sql`**，该初始化脚本含有 `DROP TABLE` 语句。
+执行前请先备份数据库，并确认当前数据库已包含 `event`、`sport_item`、`registration`、`schedule`、`result` 和 `sys_user` 等基础表。增量迁移已配置 GitHub Actions，在隔离 MySQL 8.0 环境自动验证。**不要在已有业务数据库上重新执行 `docs/04-DB/schema.sql`**，该初始化脚本含有 `DROP TABLE` 语句。
 
 ### 后端启动
 
