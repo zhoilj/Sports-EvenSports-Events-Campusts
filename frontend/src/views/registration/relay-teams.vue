@@ -254,7 +254,11 @@ async function loadEligibleMembers(keyword = '', resetSelection = false) {
   if (resetSelection) formData.memberUserIds = []
   membersLoading.value = true
   try {
-    const res = await get('/relay-teams/eligible-members', { keyword })
+    const res = await get('/relay-teams/eligible-members', {
+      sportItemId: formData.sportItemId,
+      teamId: editingTeamId.value,
+      keyword
+    })
     if (res.code === 200) {
       memberOptions.value = (res.data || []).filter((member: any) => member.userId !== currentUserId.value)
     }
