@@ -55,6 +55,12 @@ public class Schedule extends BaseEntity {
     private Integer roundNo;
 
     /**
+     * PRELIMINARY / SEMIFINAL / FINAL / FIELD_FINAL
+     */
+    @TableField("round_type")
+    private String roundType;
+
+    /**
      * 组别（如: A组/B组）
      */
     @TableField("group_no")
