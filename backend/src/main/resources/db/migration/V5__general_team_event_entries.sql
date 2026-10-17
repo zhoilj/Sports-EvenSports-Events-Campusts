@@ -27,6 +27,7 @@ UPDATE sport_item
 SET is_team_event = 1
 WHERE is_relay = 1
    OR item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
+   OR item_name LIKE '%和谐共进%' OR item_name LIKE '%竞步跑%'
    OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
    OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%高杆绣球%'
    OR item_name LIKE '%背篓接绣球%' OR item_name LIKE '%背篓投绣球%'
