@@ -48,4 +48,10 @@ public interface CompetitionResultService extends IService<CompetitionResult> {
      * 批量录入成绩
      */
     void batchSaveResults(List<CompetitionResult> results);
+
+    void reviewResult(Long id, Integer status, String remark);
+
+    int publishScheduleResults(Long scheduleId);
+
+    void deleteResult(Long id);
 }
