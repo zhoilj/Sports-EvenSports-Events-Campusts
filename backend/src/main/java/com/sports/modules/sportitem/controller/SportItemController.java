@@ -110,8 +110,12 @@ public class SportItemController {
                     && (name.contains("100米") || name.contains("200米")
                     || name.matches(".*4[×xX]100米接力.*"));
             item.setRoundPolicy(prelimFinal ? "PRELIMINARY_FINAL" : "FINAL_ONLY");
+            boolean participationEvent = name.contains("趣味") || name.contains("车轮滚滚")
+                    || name.contains("旱地龙舟") || name.contains("袋鼠跳") || name.contains("滚铁环")
+                    || name.contains("企鹅漫步") || name.contains("协同大转盘")
+                    || name.contains("集体跳长绳");
             item.setScoringMultiplier(Integer.valueOf(1).equals(item.getIsRelay()) || groupEvent ? 2 : 1);
-            item.setParticipationPoints(groupEvent ? 3 : 0);
+            item.setParticipationPoints(participationEvent ? 3 : 0);
             item.setRecordPoints(9);
             sportItemService.updateById(item);
             updated++;
