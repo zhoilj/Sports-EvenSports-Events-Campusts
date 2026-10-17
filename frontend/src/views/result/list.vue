@@ -94,8 +94,8 @@
         <el-form-item label="成绩" prop="score">
           <el-input-number v-model="formData.score" :precision="2" :step="0.1" />
         </el-form-item>
-        <el-form-item label="单位" prop="unit">
-          <el-input v-model="formData.unit" placeholder="如：秒、米、分" style="width: 150px" />
+        <el-form-item label="成绩文本" prop="scoreText">
+          <el-input v-model="formData.scoreText" placeholder="如：10.25秒、5.60米" style="width: 180px" />
         </el-form-item>
         <el-form-item label="名次" prop="ranking">
           <el-input-number v-model="formData.ranking" :min="1" :max="100" />
@@ -179,7 +179,7 @@ const formData = reactive({
   sportItemId: null as number | null,
   registrationId: null as number | null,
   score: 0,
-  unit: '',
+  scoreText: '',
   ranking: 1,
   points: 0,
   remark: ''
@@ -242,7 +242,7 @@ function handleAdd() {
   dialogTitle.value = '录入成绩'
   Object.assign(formData, {
     eventId: null, sportItemId: null, registrationId: null,
-    score: 0, unit: '', ranking: 1, points: 0, remark: ''
+    score: 0, scoreText: '', ranking: 1, points: 0, remark: ''
   })
   formSportItemOptions.value = []
   participantOptions.value = []
