@@ -51,6 +51,12 @@ public class CompetitionResult extends BaseEntity {
     private Long registrationId;
 
     /**
+     * Relay team ID; individual results use registrationId instead.
+     */
+    @TableField("relay_team_id")
+    private Long relayTeamId;
+
+    /**
      * 用户ID
      */
     private Long userId;
@@ -67,6 +73,12 @@ public class CompetitionResult extends BaseEntity {
     private String scoreText;
 
     /**
+     * VALID / DNS / DNF / DQ / WD.
+     */
+    @TableField("result_status")
+    private String resultStatus;
+
+    /**
      * 排名
      */
     private Integer ranking;
@@ -75,6 +87,28 @@ public class CompetitionResult extends BaseEntity {
      * 积分
      */
     private Integer points;
+
+    /** 1-pending review, 2-reviewed, 3-returned. */
+    @TableField("review_status")
+    private Integer reviewStatus;
+
+    @TableField("review_by")
+    private Long reviewerId;
+
+    @TableField("review_time")
+    private LocalDateTime reviewTime;
+
+    @TableField("review_remark")
+    private String reviewRemark;
+
+    @TableField("is_published")
+    private Integer isPublished;
+
+    @TableField("published_by")
+    private Long publishedBy;
+
+    @TableField("published_at")
+    private LocalDateTime publishedAt;
 
     /**
      * 录入人ID
