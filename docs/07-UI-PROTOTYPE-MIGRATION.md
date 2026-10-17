@@ -20,4 +20,4 @@
 - `cd frontend && npm ci && npm run build:check`
 - `cd backend && mvn -B clean verify`
 
-该分支需要通过 GitHub Actions 构建和人工业务验收后再考虑合并。
+该分支需要通过 GitHub Actions 构建和人工业务验收后再考虑合并。构建状态以本分支最新提交对应的工作流结果为准。
