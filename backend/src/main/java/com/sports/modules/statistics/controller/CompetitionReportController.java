@@ -56,10 +56,13 @@ public class CompetitionReportController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<String> exportStandings(@RequestParam Long eventId) {
         List<Map<String, Object>> standings = buildStandings(eventId);
-        StringBuilder csv = new StringBuilder("\uFEFF学院,总积分,金牌数,银牌数,铜牌数,有效成绩数\r\n");
+        StringBuilder csv = new StringBuilder("\uFEFF排名类别,排名,学院/年级专业,总积分,破纪录项次,第一名,第二名,第三名,有效成绩数\r\n");
         for (Map<String, Object> row : standings) {
-            csv.append(csv(row.get("college"))).append(',')
+            csv.append(csv(row.get("category"))).append(',')
+                    .append(row.get("rank")).append(',')
+                    .append(csv(row.get("college"))).append(',')
                     .append(row.get("points")).append(',')
+                    .append(row.get("recordCount")).append(',')
                     .append(row.get("gold")).append(',')
                     .append(row.get("silver")).append(',')
                     .append(row.get("bronze")).append(',')
@@ -169,48 +172,150 @@ public class CompetitionReportController {
         List<CompetitionResult> results = competitionResultService.list(new LambdaQueryWrapper<CompetitionResult>()
                 .eq(CompetitionResult::getEventId, eventId)
                 .eq(CompetitionResult::getIsPublished, 1)
-                .eq(CompetitionResult::getResultStatus, "VALID")
-                .isNotNull(CompetitionResult::getRanking));
+                .orderByAsc(CompetitionResult::getSportItemId)
+                .orderByAsc(CompetitionResult::getRanking));
         Map<Long, Schedule> scheduleCache = new HashMap<>();
-        Map<String, Map<String, Object>> byCollege = new TreeMap<>();
+        Map<Long, SportItem> itemCache = new HashMap<>();
+        Map<Long, SysUser> userCache = new HashMap<>();
+        Map<Long, RelayTeam> teamCache = new HashMap<>();
+        Map<String, Map<String, Object>> aggregates = new HashMap<>();
+
         for (CompetitionResult result : results) {
             if (result.getScheduleId() != null) {
                 Schedule schedule = scheduleCache.computeIfAbsent(result.getScheduleId(), scheduleService::getById);
-                if (schedule != null && !("FINAL".equalsIgnoreCase(schedule.getRoundType())
+                if (schedule == null || !("FINAL".equalsIgnoreCase(schedule.getRoundType())
                         || "FIELD_FINAL".equalsIgnoreCase(schedule.getRoundType()))) continue;
             }
-            String college = "";
+            SportItem item = itemCache.computeIfAbsent(result.getSportItemId(), sportItemService::getById);
+            if (item == null) continue;
+            RelayTeam team = null;
+            SysUser user = null;
             if (result.getRelayTeamId() != null) {
-                RelayTeam team = relayTeamService.getById(result.getRelayTeamId());
-                if (team != null) college = team.getCollege();
+                team = teamCache.computeIfAbsent(result.getRelayTeamId(), relayTeamService::getById);
             } else if (result.getUserId() != null) {
-                SysUser user = sysUserService.getById(result.getUserId());
-                if (user != null) college = user.getCollege();
+                user = userCache.computeIfAbsent(result.getUserId(), sysUserService::getById);
             }
-            if (college == null || college.isBlank()) college = "未填写学院";
-            Map<String, Object> row = byCollege.computeIfAbsent(college, key -> {
-                Map<String, Object> item = new HashMap<>();
-                item.put("college", key);
-                item.put("points", 0);
-                item.put("gold", 0);
-                item.put("silver", 0);
-                item.put("bronze", 0);
-                item.put("resultCount", 0);
-                return item;
-            });
-            row.put("points", ((Number) row.get("points")).intValue() + (result.getPoints() == null ? 0 : result.getPoints()));
-            row.put("resultCount", ((Number) row.get("resultCount")).intValue() + 1);
-            if (Objects.equals(result.getRanking(), 1)) row.put("gold", ((Number) row.get("gold")).intValue() + 1);
-            if (Objects.equals(result.getRanking(), 2)) row.put("silver", ((Number) row.get("silver")).intValue() + 1);
-            if (Objects.equals(result.getRanking(), 3)) row.put("bronze", ((Number) row.get("bronze")).intValue() + 1);
+            String college = team != null ? team.getCollege() : (user == null ? null : user.getCollege());
+            String className = team != null ? team.getClassName() : (user == null ? null : user.getClassName());
+            String division = resolveDivision(item);
+            String gender = resolveGenderCategory(item);
+            if ("A".equals(division)) {
+                if ("MALE".equals(gender)) {
+                    addStanding(aggregates, "甲组男子", college, result);
+                    addStanding(aggregates, "甲组男女团体", college, result);
+                } else if ("FEMALE".equals(gender)) {
+                    addStanding(aggregates, "甲组女子", college, result);
+                    addStanding(aggregates, "甲组男女团体", college, result);
+                } else {
+                    addStanding(aggregates, "甲组男女团体", college, result);
+                }
+            } else if ("B".equals(division)) {
+                addStanding(aggregates, "乙组年级专业", className, result);
+            } else if ("STAFF".equals(division)) {
+                addStanding(aggregates, "教工组", college, result);
+            } else {
+                addStanding(aggregates, "其他组", college, result);
+            }
         }
-        return byCollege.values().stream().sorted(
-                Comparator.<Map<String, Object>>comparingInt(row -> ((Number) row.get("points")).intValue()).reversed()
-                        .thenComparing(Comparator.<Map<String, Object>>comparingInt(row -> ((Number) row.get("gold")).intValue()).reversed())
-                        .thenComparing(Comparator.<Map<String, Object>>comparingInt(row -> ((Number) row.get("silver")).intValue()).reversed())
-                        .thenComparing(Comparator.<Map<String, Object>>comparingInt(row -> ((Number) row.get("bronze")).intValue()).reversed())
-                        .thenComparing(row -> String.valueOf(row.get("college"))))
-                .collect(Collectors.toList());
+
+        List<String> categoryOrder = List.of("甲组男子", "甲组女子", "甲组男女团体", "乙组年级专业", "教工组", "其他组");
+        List<Map<String, Object>> output = new ArrayList<>();
+        for (String category : categoryOrder) {
+            List<Map<String, Object>> rows = aggregates.values().stream()
+                    .filter(row -> category.equals(row.get("category")))
+                    .sorted(standingComparator())
+                    .collect(Collectors.toList());
+            int sequential = 0;
+            int rank = 0;
+            Map<String, Object> previous = null;
+            for (Map<String, Object> row : rows) {
+                sequential++;
+                if (previous == null || !sameStanding(previous, row)) rank = sequential;
+                row.put("rank", rank);
+                output.add(row);
+                previous = row;
+            }
+        }
+        return output;
+    }
+
+    private void addStanding(Map<String, Map<String, Object>> aggregates, String category,
+                             String teamName, CompetitionResult result) {
+        String label = teamName == null || teamName.isBlank() ? "未填写学院/年级专业" : teamName.trim();
+        String key = category + "::" + label;
+        Map<String, Object> row = aggregates.computeIfAbsent(key, ignored -> {
+            Map<String, Object> created = new HashMap<>();
+            created.put("category", category);
+            created.put("college", label);
+            created.put("points", 0);
+            created.put("recordCount", 0);
+            created.put("gold", 0);
+            created.put("silver", 0);
+            created.put("bronze", 0);
+            created.put("resultCount", 0);
+            for (int place = 1; place <= 8; place++) created.put("place" + place, 0);
+            return created;
+        });
+        row.put("points", number(row, "points") + (result.getPoints() == null ? 0 : result.getPoints()));
+        row.put("resultCount", number(row, "resultCount") + 1);
+        if (Objects.equals(result.getIsRecord(), 1)) {
+            row.put("recordCount", number(row, "recordCount") + 1);
+        }
+        if ("VALID".equals(result.getResultStatus()) && result.getRanking() != null
+                && result.getRanking() >= 1 && result.getRanking() <= 8) {
+            String placeKey = "place" + result.getRanking();
+            row.put(placeKey, number(row, placeKey) + 1);
+            if (result.getRanking() == 1) row.put("gold", number(row, "gold") + 1);
+            if (result.getRanking() == 2) row.put("silver", number(row, "silver") + 1);
+            if (result.getRanking() == 3) row.put("bronze", number(row, "bronze") + 1);
+        }
+    }
+
+    private int number(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        return value instanceof Number ? ((Number) value).intValue() : 0;
+    }
+
+    private Comparator<Map<String, Object>> standingComparator() {
+        Comparator<Map<String, Object>> comparator = Comparator
+                .<Map<String, Object>>comparingInt(row -> number(row, "points")).reversed()
+                .thenComparing(Comparator.<Map<String, Object>>comparingInt(row -> number(row, "recordCount")).reversed());
+        for (int place = 1; place <= 8; place++) {
+            String key = "place" + place;
+            comparator = comparator.thenComparing(Comparator.<Map<String, Object>>comparingInt(row -> number(row, key)).reversed());
+        }
+        return comparator.thenComparing(row -> String.valueOf(row.get("college")));
+    }
+
+    private boolean sameStanding(Map<String, Object> left, Map<String, Object> right) {
+        if (number(left, "points") != number(right, "points")
+                || number(left, "recordCount") != number(right, "recordCount")) return false;
+        for (int place = 1; place <= 8; place++) {
+            String key = "place" + place;
+            if (number(left, key) != number(right, key)) return false;
+        }
+        return true;
+    }
+
+    private String resolveDivision(SportItem item) {
+        String division = item.getDivision();
+        if (division != null && !division.isBlank() && !"OPEN".equalsIgnoreCase(division)) return division.toUpperCase();
+        String name = item.getName() == null ? "" : item.getName();
+        if (name.contains("甲组")) return "A";
+        if (name.contains("乙组")) return "B";
+        if (name.contains("教工组")) return "STAFF";
+        if (name.contains("集体") || name.contains("民体") || name.contains("趣味")) return "A";
+        return "OPEN";
+    }
+
+    private String resolveGenderCategory(SportItem item) {
+        String gender = item.getGenderCategory();
+        if (gender != null && !gender.isBlank() && !"OPEN".equalsIgnoreCase(gender)) return gender.toUpperCase();
+        String name = item.getName() == null ? "" : item.getName();
+        if (name.contains("混合接力") || name.contains("混合")) return "MIXED";
+        if (name.contains("男子")) return "MALE";
+        if (name.contains("女子")) return "FEMALE";
+        return "OPEN";
     }
 
     private String roundName(String type) {
