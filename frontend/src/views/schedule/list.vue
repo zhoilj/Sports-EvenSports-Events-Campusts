@@ -29,7 +29,8 @@
       <el-table :data="tableData" v-loading="loading" border stripe>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="eventName" label="赛事名称" min-width="150" />
-        <el-table-column prop="sportItemName" label="运动项目" width="120" />
+        <el-table-column prop="sportItemName" label="运动项目" width="150" />
+        <el-table-column label="竞赛组别" width="165"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column prop="scheduleName" label="赛程名称" width="100" />
         <el-table-column prop="roundNo" label="轮次" width="80" />
         <el-table-column prop="roundType" label="轮次类型" width="110">
@@ -78,7 +79,7 @@
         </el-form-item>
         <el-form-item label="运动项目" prop="sportItemId">
           <el-select v-model="formData.sportItemId" placeholder="请选择" filterable>
-            <el-option v-for="item in sportItemOptions" :key="item.id" :label="item.name" :value="item.id" />
+            <el-option v-for="item in sportItemOptions" :key="item.id" :label="item.name + ' · ' + groupShort(item.competitionGroup)" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="赛程名称" prop="scheduleName">
@@ -219,6 +220,17 @@ function resetQuery() {
 
 function goToOperations() {
   router.push('/competition-operations')
+}
+
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
+}
+function groupShort(group: string) {
+  if (group === 'A') return '甲组'
+  if (group === 'B') return '乙组'
+  return '未分组'
 }
 
 function roundTypeName(type: string) {
