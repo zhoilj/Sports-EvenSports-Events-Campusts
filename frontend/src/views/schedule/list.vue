@@ -117,7 +117,7 @@ import { get, post, put, del } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
-const canManage = computed(() => ['ADMIN', 'TEACHER'].includes(userStore.userInfo?.role || ''))
+const canManage = computed(() => userStore.userInfo?.role === 'ADMIN')
 
 const loading = ref(false)
 const tableData = ref<any[]>([])
