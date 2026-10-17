@@ -22,6 +22,9 @@
         <el-button type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>新增项目
         </el-button>
+        <el-button type="warning" plain :disabled="!queryParams.eventId" @click="applyOrderBookDefaults">
+          按秩序册匹配默认规则
+        </el-button>
       </div>
 
       <!-- 数据表格 -->
@@ -236,6 +239,21 @@ function resetQuery() {
   queryParams.name = ''
   queryParams.current = 1
   loadData()
+}
+
+async function applyOrderBookDefaults() {
+  if (!queryParams.eventId) {
+    ElMessage.warning('请先选择赛事')
+    return
+  }
+  await ElMessageBox.confirm(
+    '系统将根据项目名称匹配甲/乙/教工组、男女/混合类别、轮次规则、积分倍率和参与分。此操作会覆盖该赛事所有项目的上述配置，完成后仍需逐项核对秩序册。',
+    '按正式秩序册匹配规则',
+    { type: 'warning', confirmButtonText: '匹配并保存' }
+  )
+  const res = await post(`/sport-items/event/${queryParams.eventId}/apply-orderbook-defaults`)
+  ElMessage.success(res.message || `已匹配 ${res.data} 个项目，请逐项复核`)
+  await loadData()
 }
 
 function handleAdd() {
