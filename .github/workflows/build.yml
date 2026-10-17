@@ -71,6 +71,7 @@ jobs:
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events < backend/src/main/resources/db/migration/V1__campus_track_meet_additive.sql
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events < backend/src/main/resources/db/migration/V2__registration_compatibility_and_relay_config.sql
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events < backend/src/main/resources/db/migration/V3__competition_operations.sql
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events < backend/src/main/resources/db/migration/V4__official_orderbook_rules.sql
       - name: Verify required schema
         run: |
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='event' AND COLUMN_NAME='max_items_per_user'" | grep -qx 1
@@ -78,6 +79,9 @@ jobs:
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME IN ('relay_team','relay_team_member','schedule_entry','checkin_record','field_attempt','scoring_rule','result_audit_log')" | grep -qx 7
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='result' AND COLUMN_NAME IN ('relay_team_id','result_status','review_status','review_by','review_time','review_remark','is_published','published_by','published_at')" | grep -qx 9
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='schedule' AND COLUMN_NAME='round_type'" | grep -qx 1
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='sport_item' AND COLUMN_NAME IN ('division','gender_category','round_policy','scoring_multiplier','participation_points','record_points')" | grep -qx 6
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='schedule' AND COLUMN_NAME IN ('qualification_count','award_count')" | grep -qx 2
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='result' AND COLUMN_NAME='is_record'" | grep -qx 1
 
   frontend:
     name: Frontend type-check and production build
