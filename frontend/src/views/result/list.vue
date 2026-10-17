@@ -151,6 +151,7 @@ const eventOptions = ref<any[]>([])
 const sportItemOptions = ref<any[]>([])
 const formSportItemOptions = ref<any[]>([])
 const formScheduleOptions = ref<any[]>([])
+const allFormScheduleOptions = ref<any[]>([])
 const participantOptions = ref<any[]>([])
 const relayTeamOptions = ref<any[]>([])
 const queryParams = reactive({ current: 1, size: 10, eventId: null as number | null, sportItemId: null as number | null })
@@ -223,12 +224,14 @@ function resetQuery() {
   loadData()
 }
 
-function handleAdd() {
+async function handleAdd() {
   editingId.value = null
   dialogTitle.value = '录入比赛成绩'
+  const selectedEventId = queryParams.eventId
+  const selectedItemId = queryParams.sportItemId
   Object.assign(formData, {
-    eventId: queryParams.eventId,
-    sportItemId: queryParams.sportItemId,
+    eventId: selectedEventId,
+    sportItemId: null,
     scheduleId: null,
     entryType: 'INDIVIDUAL',
     registrationId: null,
@@ -240,11 +243,17 @@ function handleAdd() {
   })
   formSportItemOptions.value = []
   formScheduleOptions.value = []
+  allFormScheduleOptions.value = []
   participantOptions.value = []
   relayTeamOptions.value = []
+  if (selectedEventId) {
+    await onEventChange(selectedEventId)
+    if (selectedItemId) {
+      formData.sportItemId = selectedItemId
+      await onSportItemChange(selectedItemId)
+    }
+  }
   dialogVisible.value = true
-  if (formData.eventId) onEventChange(formData.eventId)
-  if (formData.sportItemId) onSportItemChange(formData.sportItemId)
 }
 
 async function handleEdit(row: any) {
@@ -263,6 +272,7 @@ async function handleEdit(row: any) {
     remark: row.remark || ''
   })
   await onEventChange(row.eventId)
+  formData.sportItemId = row.sportItemId
   await onSportItemChange(row.sportItemId)
   formData.scheduleId = row.scheduleId
   if (row.relayTeamId) formData.relayTeamId = row.relayTeamId
@@ -277,14 +287,17 @@ async function onEventChange(eventId: number | null) {
   formData.relayTeamId = null
   formSportItemOptions.value = []
   formScheduleOptions.value = []
+  allFormScheduleOptions.value = []
   if (!eventId) return
   const [itemsRes, schedulesRes] = await Promise.all([
     get('/sport-items', { current: 1, size: 100, eventId }),
     get('/schedules', { current: 1, size: 100, eventId })
   ])
   if (itemsRes.code === 200) formSportItemOptions.value = itemsRes.data.records || []
-  if (schedulesRes.code === 200) formScheduleOptions.value = schedulesRes.data.records || []
-  if (editingId.value) formData.sportItemId = formData.sportItemId
+  if (schedulesRes.code === 200) {
+    allFormScheduleOptions.value = schedulesRes.data.records || []
+    formScheduleOptions.value = [...allFormScheduleOptions.value]
+  }
 }
 
 async function onSportItemChange(sportItemId: number | null) {
@@ -297,7 +310,7 @@ async function onSportItemChange(sportItemId: number | null) {
     formScheduleOptions.value = []
     return
   }
-  formScheduleOptions.value = formScheduleOptions.value.filter(s => s.sportItemId === sportItemId)
+  formScheduleOptions.value = allFormScheduleOptions.value.filter(s => s.sportItemId === sportItemId)
   const selected = formSportItemOptions.value.find(item => item.id === sportItemId)
   if (selected?.isRelay === 1) formData.entryType = 'RELAY'
   else formData.entryType = 'INDIVIDUAL'
