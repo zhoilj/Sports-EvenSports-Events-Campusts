@@ -38,6 +38,10 @@ public class SportItem extends BaseEntity {
     @TableField("item_name")
     private String name;
 
+    /** A=普通本科组，B=体育专业组；与运动员学籍组别严格匹配。 */
+    @TableField("competition_group")
+    private String competitionGroup;
+
     /**
      * 项目类型（TRACK-径赛 FIELD-田赛 BALL-球类 SWIMMING-游泳 OTHER-其他）
      */
