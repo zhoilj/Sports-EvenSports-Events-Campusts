@@ -37,7 +37,7 @@
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="eventName" label="赛事名称" min-width="150" />
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
-        <el-table-column prop="userName" label="参赛者" width="100" />
+        <el-table-column prop="realName" label="参赛者" width="100" />
         <el-table-column prop="studentNo" label="学号" width="120" />
         <el-table-column prop="score" label="成绩" width="100" />
         <el-table-column prop="unit" label="单位" width="80" />
@@ -86,9 +86,9 @@
             <el-option v-for="item in formSportItemOptions" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="参赛者" prop="userId">
-          <el-select v-model="formData.userId" placeholder="请选择" filterable>
-            <el-option v-for="item in participantOptions" :key="item.userId" :label="item.userName" :value="item.userId" />
+        <el-form-item label="已审核报名" prop="registrationId">
+          <el-select v-model="formData.registrationId" placeholder="请选择报名记录" filterable>
+            <el-option v-for="item in participantOptions" :key="item.id" :label="`${item.realName || item.username}（${item.studentNo || '无学号'}）`" :value="item.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="成绩" prop="score">
@@ -177,7 +177,7 @@ const participantOptions = ref<any[]>([])
 const formData = reactive({
   eventId: null as number | null,
   sportItemId: null as number | null,
-  userId: null as number | null,
+  registrationId: null as number | null,
   score: 0,
   unit: '',
   ranking: 1,
@@ -188,7 +188,7 @@ const formData = reactive({
 const rules: FormRules = {
   eventId: [{ required: true, message: '请选择赛事', trigger: 'change' }],
   sportItemId: [{ required: true, message: '请选择运动项目', trigger: 'change' }],
-  userId: [{ required: true, message: '请选择参赛者', trigger: 'change' }],
+  registrationId: [{ required: true, message: '请选择已审核通过的报名记录', trigger: 'change' }],
   score: [{ required: true, message: '请输入成绩', trigger: 'blur' }]
 }
 
@@ -241,7 +241,7 @@ function handleAdd() {
   editingId.value = null
   dialogTitle.value = '录入成绩'
   Object.assign(formData, {
-    eventId: null, sportItemId: null, userId: null,
+    eventId: null, sportItemId: null, registrationId: null,
     score: 0, unit: '', ranking: 1, points: 0, remark: ''
   })
   formSportItemOptions.value = []
@@ -260,7 +260,7 @@ function handleEdit(row: any) {
 
 async function onEventChange(eventId: number) {
   formData.sportItemId = null
-  formData.userId = null
+  formData.registrationId = null
   participantOptions.value = []
   if (eventId) {
     const res = await get('/sport-items', { eventId, size: 100 })
@@ -276,7 +276,7 @@ async function onSportItemChange(sportItemId: number) {
   formData.userId = null
   if (sportItemId) {
     // 获取该项目已通过审核的报名人员
-    const res = await get('/registrations', { sportItemId, status: 'APPROVED', size: 100 })
+    const res = await get('/registrations', { eventId: formData.eventId, sportItemId, status: 'APPROVED', size: 100 })
     if (res.code === 200) {
       participantOptions.value = res.data.records || []
     }
