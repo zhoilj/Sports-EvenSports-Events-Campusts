@@ -86,6 +86,17 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             throw new BusinessException(ResultCode.REGISTRATION_LIMIT_EXCEEDED);
         }
 
+        int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
+                ? 1 : item.getMaxTeamsPerCollege();
+        long collegeTeams = this.count(new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getEventId, dto.getEventId())
+                .eq(RelayTeam::getSportItemId, dto.getSportItemId())
+                .eq(RelayTeam::getCollege, captain.getCollege())
+                .in(RelayTeam::getStatus, 1, 2));
+        if (collegeTeams >= maxPerCollege) {
+            throw new BusinessException("该项目每个学院最多可报名" + maxPerCollege + "支队伍");
+        }
+
         List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
         validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName());
         roster = arrangeMixedRelayRoster(roster, item);
@@ -100,7 +111,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         team.setCreatorUserId(currentUserId);
         team.setStatus(1);
         this.save(team);
-        saveRoster(team.getId(), roster, item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount());
+        saveRoster(team.getId(), roster, requiredMemberCount(item));
         refreshRelayTeamCount(item);
         return team.getId();
     }
@@ -210,7 +221,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         roster = arrangeMixedRelayRoster(roster, item);
         ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
         memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
-        saveRoster(id, roster, item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount());
+        saveRoster(id, roster, requiredMemberCount(item));
     }
 
     @Override
@@ -261,8 +272,10 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         if (item.getStatus() == null || item.getStatus() != 1) {
             throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "该项目当前未开放报名");
         }
-        if (item.getIsRelay() == null || item.getIsRelay() != 1) {
-            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "所选项目不是接力项目");
+        boolean relay = Integer.valueOf(1).equals(item.getIsRelay());
+        boolean teamEvent = Integer.valueOf(1).equals(item.getIsTeamEvent());
+        if (!relay && !teamEvent) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "所选项目不是接力或集体队伍项目");
         }
     }
 
@@ -276,8 +289,11 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             throw new BusinessException("同一队伍不能重复登记同一名队员");
         }
         if (!roster.contains(creatorId)) roster.add(0, creatorId);
-        int required = item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount();
-        int reserves = item.getRelayReserveCount() == null ? 0 : item.getRelayReserveCount();
+        int required = requiredMemberCount(item);
+        int reserves = reserveMemberCount(item);
+        if (required < 1) {
+            throw new BusinessException("请先在项目管理中配置该团体项目的队伍人数");
+        }
         if (roster.size() < required || roster.size() > required + reserves) {
             throw new BusinessException("该项目要求" + required + "名正式队员，最多另加" + reserves + "名替补队员");
         }
@@ -294,21 +310,22 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
                     && !captainClass.equals(user.getClassName())) {
                 throw new BusinessException("乙组接力队员必须来自同一年级/专业班级，团体积分按班级归属统计");
             }
-            boolean mixedRelay = "MIXED".equalsIgnoreCase(item.getGenderCategory())
-                    || (item.getName() != null && item.getName().contains("混合接力"));
-            if (!mixedRelay && "MALE".equalsIgnoreCase(item.getGenderCategory())
+            boolean relay = Integer.valueOf(1).equals(item.getIsRelay());
+            boolean mixedRelay = relay && ("MIXED".equalsIgnoreCase(item.getGenderCategory())
+                    || (item.getName() != null && item.getName().contains("混合接力")));
+            if (relay && !mixedRelay && "MALE".equalsIgnoreCase(item.getGenderCategory())
                     && !Objects.equals(user.getGender(), 1)) {
                 throw new BusinessException("男子接力项目的队员必须全部为男性");
             }
-            if (!mixedRelay && "FEMALE".equalsIgnoreCase(item.getGenderCategory())
+            if (relay && !mixedRelay && "FEMALE".equalsIgnoreCase(item.getGenderCategory())
                     && !Objects.equals(user.getGender(), 2)) {
                 throw new BusinessException("女子接力项目的队员必须全部为女性");
             }
-            if (!mixedRelay && Integer.valueOf(1).equals(item.getGenderLimit())
+            if (relay && !mixedRelay && Integer.valueOf(1).equals(item.getGenderLimit())
                     && !Objects.equals(user.getGender(), 1)) {
                 throw new BusinessException("该接力项目仅限男性参赛");
             }
-            if (!mixedRelay && Integer.valueOf(2).equals(item.getGenderLimit())
+            if (relay && !mixedRelay && Integer.valueOf(2).equals(item.getGenderLimit())
                     && !Objects.equals(user.getGender(), 2)) {
                 throw new BusinessException("该接力项目仅限女性参赛");
             }
@@ -316,7 +333,8 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
     }
 
     private List<Long> arrangeMixedRelayRoster(List<Long> roster, SportItem item) {
-        if (item == null || !("MIXED".equalsIgnoreCase(item.getGenderCategory())
+        if (item == null || !Integer.valueOf(1).equals(item.getIsRelay())
+                || !("MIXED".equalsIgnoreCase(item.getGenderCategory())
                 || (item.getName() != null && item.getName().contains("混合接力")))) {
             return roster;
         }
@@ -361,6 +379,22 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
                 throw new BusinessException("队员已参加该项目的其他待审或已通过队伍");
             }
         }
+    }
+
+    private int requiredMemberCount(SportItem item) {
+        if (item == null) return 0;
+        if (Integer.valueOf(1).equals(item.getIsRelay())) {
+            return item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount();
+        }
+        return item.getTeamMemberCount() == null ? 0 : item.getTeamMemberCount();
+    }
+
+    private int reserveMemberCount(SportItem item) {
+        if (item == null) return 0;
+        if (Integer.valueOf(1).equals(item.getIsRelay())) {
+            return item.getRelayReserveCount() == null ? 0 : item.getRelayReserveCount();
+        }
+        return item.getTeamReserveCount() == null ? 0 : item.getTeamReserveCount();
     }
 
     private void saveRoster(Long teamId, List<Long> roster, int formalCount) {
