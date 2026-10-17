@@ -26,6 +26,10 @@ public class RelayTeam extends BaseEntity {
     @TableField("sport_item_id")
     private Long sportItemId;
 
+    /** 队伍竞赛组别；所有队员必须属于同一组。 */
+    @TableField("competition_group")
+    private String competitionGroup;
+
     @TableField("team_name")
     private String teamName;
 
