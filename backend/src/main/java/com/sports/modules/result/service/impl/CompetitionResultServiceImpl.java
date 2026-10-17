@@ -312,6 +312,13 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         if (item == null || !Objects.equals(item.getEventId(), result.getEventId())) {
             throw new BusinessException("成绩所属项目与赛事不一致");
         }
+        boolean teamItem = Objects.equals(item.getIsTeamEvent(), 1) || Objects.equals(item.getIsRelay(), 1);
+        if (teamItem && result.getRegistrationId() != null) {
+            throw new BusinessException("团体项目成绩必须关联审核通过的参赛队伍");
+        }
+        if (!teamItem && result.getRelayTeamId() != null) {
+            throw new BusinessException("个人项目不能关联参赛队伍");
+        }
         if (result.getScheduleId() != null) {
             Schedule schedule = scheduleService.getById(result.getScheduleId());
             if (schedule == null || !Objects.equals(schedule.getEventId(), result.getEventId())
@@ -349,12 +356,12 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         }
 
         if (result.getRelayTeamId() != null) {
-            if (result.getRegistrationId() != null) throw new BusinessException("接力成绩不能同时关联个人报名记录");
+            if (result.getRegistrationId() != null) throw new BusinessException("队伍成绩不能同时关联个人报名记录");
             RelayTeam team = relayTeamService.getById(result.getRelayTeamId());
             if (team == null || !Objects.equals(team.getStatus(), 2)
                     || !Objects.equals(team.getEventId(), result.getEventId())
                     || !Objects.equals(team.getSportItemId(), result.getSportItemId())) {
-                throw new BusinessException("接力成绩必须关联同赛事、同项目且审核通过的接力队伍");
+                throw new BusinessException("队伍成绩必须关联同赛事、同项目且审核通过的参赛队伍");
             }
             result.setUserId(null);
         } else {
