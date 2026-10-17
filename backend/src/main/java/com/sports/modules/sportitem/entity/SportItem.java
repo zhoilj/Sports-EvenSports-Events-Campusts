@@ -92,6 +92,12 @@ public class SportItem extends BaseEntity {
     private String scoreType;
 
     /**
+     * Result ordering rule: ASC for lower-is-better (e.g. time), DESC for higher-is-better.
+     */
+    @TableField("sort_rule")
+    private String sortRule;
+
+    /**
      * 成绩单位
      */
     @TableField("result_unit")
