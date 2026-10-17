@@ -30,11 +30,12 @@ public class SportItemServiceImpl extends ServiceImpl<SportItemMapper, SportItem
     }
 
     @Override
-    public IPage<SportItem> pageItems(Integer current, Integer size, Long eventId, String type, Integer status, String competitionGroup) {
+    public IPage<SportItem> pageItems(Integer current, Integer size, Long eventId, String name, String type, Integer status, String competitionGroup) {
         Page<SportItem> page = new Page<>(current, size);
 
         LambdaQueryWrapper<SportItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, SportItem::getEventId, eventId)
+                .like(StringUtils.hasText(name), SportItem::getName, name)
                 .eq(StringUtils.hasText(type), SportItem::getType, type)
                 .eq(status != null, SportItem::getStatus, status)
                 .eq(StringUtils.hasText(competitionGroup), SportItem::getCompetitionGroup, competitionGroup)
