@@ -514,8 +514,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
     }
 
     private String groupLabel(int index) {
-        if (index < 26) return String.valueOf((char) ('A' + index));
-        return "G" + (index + 1);
+        return String.valueOf(index + 1);
     }
 
     private LocalTime effectiveEnd(Schedule schedule) {
