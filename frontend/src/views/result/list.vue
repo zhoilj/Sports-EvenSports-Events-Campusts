@@ -96,8 +96,8 @@
         </el-form-item>
         <el-form-item label="参赛主体">
           <el-radio-group v-model="formData.entryType" :disabled="!!editingId" @change="loadParticipants">
-            <el-radio value="INDIVIDUAL">个人</el-radio>
-            <el-radio value="RELAY">接力队伍</el-radio>
+            <el-radio label="INDIVIDUAL">个人</el-radio>
+            <el-radio label="RELAY">接力队伍</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="formData.entryType === 'INDIVIDUAL'" label="已通过报名" prop="registrationId">
