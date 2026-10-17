@@ -17,6 +17,8 @@ class RelayTeamServiceImplTest {
     @Test
     void automaticallyAddsCaptainAndPreservesRelayOrder() {
         SportItem item = new SportItem();
+        item.setIsRelay(1);
+        item.setIsTeamEvent(1);
         item.setRelayMemberCount(4);
         item.setRelayReserveCount(1);
 
