@@ -108,7 +108,7 @@
             <el-option v-for="item in participantOptions" :key="item.id" :label="`${item.realName || item.username}（${item.studentNo || '无学号'} · ${item.college || '未填写学院'}）`" :value="item.id" />
           </el-select>
         </el-form-item>
-        <el-form-item v-else label="已审核接力队伍" prop="relayTeamId">
+        <el-form-item v-else label="已审核参赛队伍" prop="relayTeamId">
           <el-select v-model="formData.relayTeamId" placeholder="选择接力队伍" filterable>
             <el-option v-for="item in relayTeamOptions" :key="item.id" :label="`${item.teamName}（${item.college || '未填写学院'}）`" :value="item.id" />
           </el-select>
@@ -380,7 +380,7 @@ async function handleSubmit() {
     return
   }
   if (formData.entryType === 'RELAY' && !formData.relayTeamId) {
-    ElMessage.warning('请选择已审核通过的接力队伍')
+    ElMessage.warning('请选择已审核通过的参赛队伍')
     return
   }
   await formRef.value.validate(async valid => {
