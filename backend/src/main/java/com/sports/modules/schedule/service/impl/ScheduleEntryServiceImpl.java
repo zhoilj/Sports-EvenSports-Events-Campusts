@@ -324,6 +324,9 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
         }
         if (selected.isEmpty()) throw new BusinessException("没有符合条件的晋级选手");
+        if ("FINAL".equalsIgnoreCase(target.getRoundType()) && selected.size() > groupSize) {
+            throw new BusinessException("决赛晋级人数超过目标每组容量，请调整晋级人数或组容量");
+        }
         selected.sort(scoreOrder);
 
         List<ScheduleEntry> candidates = new ArrayList<>();
