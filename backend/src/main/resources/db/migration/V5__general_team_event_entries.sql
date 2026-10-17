@@ -35,6 +35,20 @@ WHERE is_relay = 1
    OR item_name LIKE '%协同大转盘%';
 
 UPDATE sport_item
+SET scoring_multiplier = 2
+WHERE is_team_event = 1 AND scoring_multiplier = 1;
+
+UPDATE sport_item
+SET division = 'A'
+WHERE division = 'OPEN' AND is_team_event = 1
+  AND (item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
+   OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
+   OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%高杆绣球%'
+   OR item_name LIKE '%背篓%' OR item_name LIKE '%校园越野跑%' OR item_name LIKE '%车轮滚滚%'
+   OR item_name LIKE '%旱地龙舟%' OR item_name LIKE '%袋鼠跳%' OR item_name LIKE '%滚铁环%'
+   OR item_name LIKE '%企鹅漫步%' OR item_name LIKE '%协同大转盘%');
+
+UPDATE sport_item
 SET team_member_count = CASE
   WHEN item_name LIKE '%校园越野跑%' THEN 10
   WHEN item_name LIKE '%和谐共进%' THEN 10
