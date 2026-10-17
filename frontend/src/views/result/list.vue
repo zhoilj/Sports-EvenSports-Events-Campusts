@@ -242,7 +242,7 @@ function handleAdd() {
   dialogVisible.value = true
 }
 
-function handleEdit(row: any) {
+async function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑成绩'
   Object.assign(formData, row)
