@@ -31,6 +31,17 @@
         <el-table-column prop="name" label="项目名称" width="150" />
         <el-table-column prop="categoryName" label="类别" width="100" />
         <el-table-column prop="genderLimitName" label="性别限制" width="100" />
+        <el-table-column label="组别" width="90">
+          <template #default="{ row }">{{ divisionName(row.division) }}</template>
+        </el-table-column>
+        <el-table-column label="性别类别" width="100">
+          <template #default="{ row }">{{ genderCategoryName(row.genderCategory) }}</template>
+        </el-table-column>
+        <el-table-column label="轮次规则" width="120">
+          <template #default="{ row }">{{ roundPolicyName(row.roundPolicy) }}</template>
+        </el-table-column>
+        <el-table-column prop="scoringMultiplier" label="积分倍率" width="90" />
+        <el-table-column prop="participationPoints" label="参与分" width="90" />
         <el-table-column prop="maxParticipants" label="人数上限" width="100">
           <template #default="{ row }">{{ row.maxParticipants > 0 ? row.maxParticipants : '不限' }}</template>
         </el-table-column>
@@ -69,7 +80,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="项目名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入项目名称" />
+          <el-input v-model="formData.name" placeholder="请输入项目名称" @change="suggestRoundPolicy" />
         </el-form-item>
         <el-form-item label="项目类型" prop="type">
           <el-select v-model="formData.type" placeholder="请选择">
@@ -79,6 +90,40 @@
             <el-option label="水上项目" value="WATER" />
             <el-option label="其他" value="OTHER" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="竞赛组别" prop="division">
+          <el-select v-model="formData.division" placeholder="请选择组别">
+            <el-option label="甲组" value="A" />
+            <el-option label="乙组" value="B" />
+            <el-option label="教工组" value="STAFF" />
+            <el-option label="不分组" value="OPEN" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="成绩归属性别" prop="genderCategory">
+          <el-select v-model="formData.genderCategory" placeholder="请选择成绩归属类别">
+            <el-option label="男子" value="MALE" />
+            <el-option label="女子" value="FEMALE" />
+            <el-option label="混合" value="MIXED" />
+            <el-option label="开放/集体" value="OPEN" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="轮次规则" prop="roundPolicy">
+          <el-select v-model="formData.roundPolicy" placeholder="请选择轮次规则">
+            <el-option label="仅决赛" value="FINAL_ONLY" />
+            <el-option label="预赛+决赛" value="PRELIMINARY_FINAL" />
+            <el-option label="允许自定义" value="FLEXIBLE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="积分倍率" prop="scoringMultiplier">
+          <el-input-number v-model="formData.scoringMultiplier" :min="1" :max="5" />
+          <span class="form-tip">接力、集体、民体等按规程设置为2</span>
+        </el-form-item>
+        <el-form-item label="参与积分" prop="participationPoints">
+          <el-input-number v-model="formData.participationPoints" :min="0" :max="100" />
+          <span class="form-tip">仅对完成检录且实际参赛的成绩加分</span>
+        </el-form-item>
+        <el-form-item label="破纪录积分" prop="recordPoints">
+          <el-input-number v-model="formData.recordPoints" :min="0" :max="100" />
         </el-form-item>
         <el-form-item label="性别限制" prop="genderLimit">
           <el-select v-model="formData.genderLimit" placeholder="请选择">
@@ -92,7 +137,7 @@
           <span class="form-tip">0 表示不限人数</span>
         </el-form-item>
         <el-form-item label="接力项目">
-          <el-switch v-model="formData.isRelay" :active-value="1" :inactive-value="0" />
+          <el-switch v-model="formData.isRelay" :active-value="1" :inactive-value="0" @change="onRelayChange" />
         </el-form-item>
         <template v-if="formData.isRelay === 1">
           <el-form-item label="正式队员数" prop="relayMemberCount">
@@ -141,6 +186,12 @@ const formData = reactive({
   eventId: null as number | null,
   name: '',
   type: 'TRACK',
+  division: 'OPEN',
+  genderCategory: 'OPEN',
+  roundPolicy: 'FINAL_ONLY',
+  scoringMultiplier: 1,
+  participationPoints: 0,
+  recordPoints: 9,
   genderLimit: 0,
   maxParticipants: 100,
   isRelay: 0,
@@ -192,6 +243,8 @@ function handleAdd() {
   dialogTitle.value = '新增项目'
   Object.assign(formData, {
     eventId: null, name: '', type: 'TRACK',
+    division: 'OPEN', genderCategory: 'OPEN', roundPolicy: 'FINAL_ONLY',
+    scoringMultiplier: 1, participationPoints: 0, recordPoints: 9,
     genderLimit: 0, maxParticipants: 100, isRelay: 0,
     relayMemberCount: 4, relayReserveCount: 0, rules: ''
   })
@@ -203,6 +256,34 @@ function handleEdit(row: any) {
   dialogTitle.value = '编辑项目'
   Object.assign(formData, row)
   dialogVisible.value = true
+}
+
+function onRelayChange(value: number) {
+  if (value === 1 && formData.scoringMultiplier === 1) formData.scoringMultiplier = 2
+  if (value === 0 && formData.scoringMultiplier === 2) formData.scoringMultiplier = 1
+}
+
+function suggestRoundPolicy() {
+  const name = formData.name.replace(/\\s/g, '')
+  const isMixedRelay = /混合接力/.test(name)
+  const isPreliminaryFinal = /100米|200米/.test(name)
+    || (!isMixedRelay && /4[×xX]100米接力/.test(name))
+  formData.roundPolicy = formData.type === 'FIELD' || !isPreliminaryFinal
+    ? 'FINAL_ONLY'
+    : 'PRELIMINARY_FINAL'
+}
+
+function divisionName(value: string) {
+  const map: Record<string, string> = { A: '甲组', B: '乙组', STAFF: '教工组', OPEN: '不分组' }
+  return map[value] || value || '不分组'
+}
+function genderCategoryName(value: string) {
+  const map: Record<string, string> = { MALE: '男子', FEMALE: '女子', MIXED: '混合', OPEN: '开放/集体' }
+  return map[value] || value || '开放/集体'
+}
+function roundPolicyName(value: string) {
+  const map: Record<string, string> = { FINAL_ONLY: '仅决赛', PRELIMINARY_FINAL: '预赛+决赛', FLEXIBLE: '允许自定义' }
+  return map[value] || value || '允许自定义'
 }
 
 async function handleSubmit() {
