@@ -83,7 +83,7 @@ jobs:
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='sport_item' AND COLUMN_NAME IN ('division','gender_category','round_policy','scoring_multiplier','participation_points','record_points')" | grep -qx 6
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='schedule' AND COLUMN_NAME IN ('qualification_count','award_count')" | grep -qx 2
           mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='result' AND COLUMN_NAME='is_record'" | grep -qx 1
-          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='sport_item' AND COLUMN_NAME IN ('is_team_event','team_member_count','team_reserve_count','max_teams_per_college')" | grep -qx 4
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='sport_item' AND COLUMN_NAME IN ('is_team_event','team_member_count','team_reserve_count','max_teams_per_college','team_roster_rule')" | grep -qx 5
 
   frontend:
     name: Frontend type-check and production build
