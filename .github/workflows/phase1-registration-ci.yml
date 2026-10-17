@@ -147,7 +147,7 @@ jobs:
           assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT current_participants FROM sports_events.sport_item WHERE id=1")" "pending registration count"
           assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT current_participants FROM sports_events.sport_item WHERE id=2")" "approved registration count"
           assert_eq "0" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='sports_events' AND table_name='registration' AND index_name='uk_user_item'")" "obsolete unique index removed"
-          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema='sports_events' AND table_name='registration' AND index_name='idx_registration_event_item_user_status'")" "registration query index created"
+          assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema='sports_events' AND table_name='registration' AND index_name='idx_registration_event_item_user_status'")" "registration query index created"
           assert_eq "1" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='sports_events' AND table_name='registration_member'")" "relay roster table created"
           assert_eq "0" "$(mysql -N -B -h 127.0.0.1 -uroot -e "SELECT COUNT(*) FROM sports_events.sys_user WHERE username='student01' AND (college_id IS NULL OR class_id IS NULL)")" "college/class IDs backfilled"
 
