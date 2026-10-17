@@ -276,9 +276,10 @@ function handleEdit(row: any) {
   dialogVisible.value = true
 }
 
-function onRelayChange(value: number) {
-  if (value === 1 && formData.scoringMultiplier === 1) formData.scoringMultiplier = 2
-  if (value === 0 && formData.scoringMultiplier === 2) formData.scoringMultiplier = 1
+function onRelayChange(value: string | number | boolean) {
+  const relay = Number(value) === 1
+  if (relay && formData.scoringMultiplier === 1) formData.scoringMultiplier = 2
+  if (!relay && formData.scoringMultiplier === 2) formData.scoringMultiplier = 1
 }
 
 function suggestRoundPolicy() {
