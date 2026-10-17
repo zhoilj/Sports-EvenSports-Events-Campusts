@@ -266,7 +266,7 @@ function handleAdd() {
   dialogTitle.value = '新增赛程'
   Object.assign(formData, {
     eventId: null, sportItemId: null, scheduleName: '', roundNo: 1, roundType: 'FINAL',
-    qualificationCount: null, awardCount: 8,
+    qualificationCount: null, awardCount: null,
     groupNo: '', matchDate: '', startTime: '', endTime: '', location: '', remark: ''
   })
   sportItemOptions.value = []
@@ -281,7 +281,7 @@ async function handleEdit(row: any) {
   formData.sportItemId = row.sportItemId
   formData.roundType = row.roundType || 'FINAL'
   formData.qualificationCount = row.qualificationCount ?? null
-  formData.awardCount = row.awardCount ?? 8
+  formData.awardCount = row.awardCount ?? null
   dialogVisible.value = true
 }
 
