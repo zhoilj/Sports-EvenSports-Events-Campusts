@@ -7,6 +7,7 @@ import com.sports.common.result.ResultCode;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.dto.ScheduleEntryGenerateDTO;
 import com.sports.modules.schedule.dto.AdvanceEntriesDTO;
+import com.sports.modules.schedule.dto.ScheduleEntryPositionDTO;
 import com.sports.modules.schedule.service.ScheduleEntryService;
 import com.sports.modules.schedule.vo.ScheduleEntryVO;
 import com.sports.modules.schedule.vo.ScheduleConflictVO;
@@ -133,6 +134,14 @@ public class ScheduleController {
         int groupSize = dto == null || dto.getGroupSize() == null ? 8 : dto.getGroupSize();
         int laneCount = dto == null || dto.getLaneCount() == null ? 8 : dto.getLaneCount();
         return Result.success("已生成参赛名单", scheduleEntryService.generateEntries(id, groupSize, laneCount));
+    }
+
+    @Operation(summary = "保存官方分组分道与田赛顺序")
+    @PutMapping("/{id}/entries/positions")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Integer> updateEntryPositions(@PathVariable Long id,
+                                                @Valid @RequestBody java.util.List<@Valid ScheduleEntryPositionDTO> positions) {
+        return Result.success("分组分道已保存", scheduleEntryService.updateEntryPositions(id, positions));
     }
 
     @Operation(summary = "按预赛成绩晋级下一轮")
