@@ -253,11 +253,13 @@ function handleAdd() {
   dialogVisible.value = true
 }
 
-function handleEdit(row: any) {
+async function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑赛程'
   Object.assign(formData, row)
-  onEventChange(row.eventId)
+  await onEventChange(row.eventId)
+  formData.sportItemId = row.sportItemId
+  formData.roundType = row.roundType || 'FINAL'
   dialogVisible.value = true
 }
 
