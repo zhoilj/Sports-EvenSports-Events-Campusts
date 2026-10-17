@@ -13,11 +13,11 @@ class RegistrationServiceImplTest {
 
     @Test
     void parsesFrontEndAndDatabaseStatusValues() {
-        assertEquals(1, ReflectionTestUtils.invokeMethod(service, "parseStatus", "PENDING"));
-        assertEquals(2, ReflectionTestUtils.invokeMethod(service, "parseStatus", "APPROVED"));
-        assertEquals(3, ReflectionTestUtils.invokeMethod(service, "parseStatus", "REJECTED"));
-        assertEquals(4, ReflectionTestUtils.invokeMethod(service, "parseStatus", "CANCELLED"));
-        assertEquals(2, ReflectionTestUtils.invokeMethod(service, "parseStatus", "2"));
+        assertEquals(Integer.valueOf(1), (Integer) ReflectionTestUtils.invokeMethod(service, "parseStatus", "PENDING"));
+        assertEquals(Integer.valueOf(2), (Integer) ReflectionTestUtils.invokeMethod(service, "parseStatus", "APPROVED"));
+        assertEquals(Integer.valueOf(3), (Integer) ReflectionTestUtils.invokeMethod(service, "parseStatus", "REJECTED"));
+        assertEquals(Integer.valueOf(4), (Integer) ReflectionTestUtils.invokeMethod(service, "parseStatus", "CANCELLED"));
+        assertEquals(Integer.valueOf(2), (Integer) ReflectionTestUtils.invokeMethod(service, "parseStatus", "2"));
     }
 
     @Test
