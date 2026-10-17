@@ -74,7 +74,12 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         }
 
         SportItem item = sportItemService.getById(schedule.getSportItemId());
-        if (item == null) throw new BusinessException("比赛项目不存在");
+        if (item == null || !Objects.equals(item.getEventId(), schedule.getEventId())) {
+            throw new BusinessException("比赛项目不存在或不属于当前赛事");
+        }
+        if (item.getStatus() == null || item.getStatus() != 1) {
+            throw new BusinessException("该项目已停用，不能生成参赛名单");
+        }
         boolean relay = Objects.equals(item.getIsRelay(), 1);
         boolean field = "FIELD".equalsIgnoreCase(item.getType());
         if (!field && !relay && groupSize > laneCount) {
@@ -247,7 +252,9 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         if (target.getStatus() == null || target.getStatus() != 1) {
             throw new BusinessException("目标赛程必须处于未开始状态");
         }
-        if ("FIELD".equalsIgnoreCase(sportItemService.getById(target.getSportItemId()).getType())) {
+        SportItem targetItem = sportItemService.getById(target.getSportItemId());
+        if (targetItem == null) throw new BusinessException("晋级目标项目不存在");
+        if ("FIELD".equalsIgnoreCase(targetItem.getType())) {
             throw new BusinessException("田赛项目不使用径赛晋级编排");
         }
         if (this.count(new LambdaQueryWrapper<ScheduleEntry>().eq(ScheduleEntry::getScheduleId, target.getId())) > 0) {
