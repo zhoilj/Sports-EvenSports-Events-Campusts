@@ -17,5 +17,5 @@ public interface RelayTeamService extends IService<RelayTeam> {
     void reviewTeam(Long id, Integer status, String remark);
     void cancelTeam(Long id);
     void replaceMembers(Long id, List<Long> memberUserIds);
-    List<RelayTeamMemberVO> getEligibleMembers(String keyword);
+    List<RelayTeamMemberVO> getEligibleMembers(Long sportItemId, Long teamId, String keyword);
 }
