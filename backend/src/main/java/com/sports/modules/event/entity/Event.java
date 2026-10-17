@@ -96,6 +96,12 @@ public class Event extends BaseEntity {
     private Integer status;
 
     /**
+     * 每名运动员在本届赛事可报名的项目数；0 表示不限制
+     */
+    @TableField("max_projects_per_athlete")
+    private Integer maxProjectsPerAthlete = 3;
+
+    /**
      * 创建人ID
      */
     @TableField("create_by")
