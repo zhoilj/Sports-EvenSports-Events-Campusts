@@ -215,14 +215,22 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         }
         if (results.isEmpty()) throw new BusinessException("该赛程暂无成绩记录");
 
+        boolean scoringRound = "FINAL".equalsIgnoreCase(schedule.getRoundType())
+                || "FIELD_FINAL".equalsIgnoreCase(schedule.getRoundType());
         Map<Integer, Integer> pointsByPlace = scoringRuleMapper.selectList(new LambdaQueryWrapper<ScoringRule>()
                         .eq(ScoringRule::getEventId, schedule.getEventId()))
                 .stream().collect(Collectors.toMap(ScoringRule::getPlaceNo, ScoringRule::getPoints, (a, b) -> a));
+        if (scoringRound && pointsByPlace.isEmpty()) {
+            throw new BusinessException("正式发布决赛成绩前，请先在“学院积分与奖牌榜”配置本届名次积分规则");
+        }
+        if (results.stream().anyMatch(r -> Objects.equals(r.getIsPublished(), 1))) {
+            throw new BusinessException("该赛程已有正式发布的成绩，不能重复发布");
+        }
         LocalDateTime now = LocalDateTime.now();
         Long operator = SecurityUtils.getUserId();
         for (CompetitionResult result : results) {
             CompetitionResult before = copyResult(result);
-            result.setPoints("VALID".equals(result.getResultStatus()) && result.getRanking() != null
+            result.setPoints(scoringRound && "VALID".equals(result.getResultStatus()) && result.getRanking() != null
                     ? pointsByPlace.getOrDefault(result.getRanking(), 0) : 0);
             result.setIsPublished(1);
             result.setPublishedBy(operator);
@@ -258,6 +266,11 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
             if (schedule == null || !Objects.equals(schedule.getEventId(), result.getEventId())
                     || !Objects.equals(schedule.getSportItemId(), result.getSportItemId())) {
                 throw new BusinessException("成绩所属赛程与赛事/项目不一致");
+            }
+            if (this.count(new LambdaQueryWrapper<CompetitionResult>()
+                    .eq(CompetitionResult::getScheduleId, result.getScheduleId())
+                    .eq(CompetitionResult::getIsPublished, 1)) > 0) {
+                throw new BusinessException("该赛程已有正式发布成绩，不能再新增或修改成绩");
             }
             long entryCount = scheduleEntryMapper.selectCount(new LambdaQueryWrapper<ScheduleEntry>()
                     .eq(ScheduleEntry::getScheduleId, schedule.getId()));
