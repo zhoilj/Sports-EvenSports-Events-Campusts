@@ -40,6 +40,42 @@ jobs:
           JWT_SECRET: ci-only-secret-value-must-be-at-least-32-bytes-long
         run: mvn --batch-mode --no-transfer-progress clean verify
 
+
+  migration:
+    name: Validate additive MySQL migrations
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: sports_events
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install MySQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-mysql-client
+      - name: Create isolated baseline schema
+        run: mysql --protocol=tcp -h 127.0.0.1 -uroot -proot < docs/04-DB/schema.sql
+      - name: Apply additive migrations
+        run: |
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events < backend/src/main/resources/db/migration/V1__campus_track_meet_additive.sql
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events < backend/src/main/resources/db/migration/V2__registration_compatibility_and_relay_config.sql
+      - name: Verify required schema
+        run: |
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='event' AND COLUMN_NAME='max_items_per_user'" | grep -qx 1
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME='sport_item' AND COLUMN_NAME IN ('current_participants','is_relay','relay_member_count','relay_reserve_count')" | grep -qx 4
+          mysql --protocol=tcp -h 127.0.0.1 -uroot -proot sports_events -N -e "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='sports_events' AND TABLE_NAME IN ('relay_team','relay_team_member','schedule_entry','checkin_record','field_attempt','scoring_rule','result_audit_log')" | grep -qx 7
+
   frontend:
     name: Frontend type-check and production build
     runs-on: ubuntu-latest
