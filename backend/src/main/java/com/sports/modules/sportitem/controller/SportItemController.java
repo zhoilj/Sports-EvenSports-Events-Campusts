@@ -65,7 +65,7 @@ public class SportItemController {
         if (sportItem.getCurrentParticipants() == null) sportItem.setCurrentParticipants(0);
         if (sportItem.getDivision() == null) sportItem.setDivision("OPEN");
         if (sportItem.getGenderCategory() == null) sportItem.setGenderCategory("OPEN");
-        if (sportItem.getRoundPolicy() == null) sportItem.setRoundPolicy("FLEXIBLE");
+        if (sportItem.getRoundPolicy() == null) sportItem.setRoundPolicy("FINAL_ONLY");
         if (sportItem.getScoringMultiplier() == null) sportItem.setScoringMultiplier(
                 Integer.valueOf(1).equals(sportItem.getIsRelay()) ? 2 : 1);
         if (sportItem.getParticipationPoints() == null) sportItem.setParticipationPoints(0);
@@ -106,7 +106,7 @@ public class SportItemController {
             item.setGenderCategory(mixedRelay ? "MIXED" : name.contains("男子") ? "MALE"
                     : name.contains("女子") ? "FEMALE" : Integer.valueOf(1).equals(item.getGenderLimit()) ? "MALE"
                     : Integer.valueOf(2).equals(item.getGenderLimit()) ? "FEMALE" : "OPEN");
-            boolean prelimFinal = !mixedRelay && "TRACK".equalsIgnoreCase(item.getType())
+            boolean prelimFinal = !mixedRelay && !groupEvent && "TRACK".equalsIgnoreCase(item.getType())
                     && (name.contains("100米") || name.contains("200米")
                     || name.matches(".*4[×xX]100米接力.*"));
             item.setRoundPolicy(prelimFinal ? "PRELIMINARY_FINAL" : "FINAL_ONLY");
