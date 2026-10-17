@@ -58,6 +58,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/registration/my.vue'),
         meta: { title: '我的报名', icon: 'Tickets', roles: ['STUDENT'] }
       },
+      {
+        path: 'relay-teams',
+        name: 'RelayTeams',
+        component: () => import('@/views/registration/relay-teams.vue'),
+        meta: { title: '接力组队', icon: 'UserFilled', roles: ['ADMIN', 'TEACHER', 'STUDENT'] }
+      },
       // 赛程管理
       {
         path: 'schedules',
