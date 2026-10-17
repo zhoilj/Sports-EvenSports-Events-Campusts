@@ -95,6 +95,14 @@
             <el-option label="田赛决赛" value="FIELD_FINAL" />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="formData.roundType === 'PRELIMINARY'" label="总晋级人数" prop="qualificationCount">
+          <el-input-number v-model="formData.qualificationCount" :min="1" :max="128" />
+          <span class="form-tip">例如：100米预赛8人晋级决赛</span>
+        </el-form-item>
+        <el-form-item v-if="['FINAL', 'FIELD_FINAL'].includes(formData.roundType)" label="录取名次" prop="awardCount">
+          <el-input-number v-model="formData.awardCount" :min="1" :max="128" />
+          <span class="form-tip">按秩序册逐项填写；不填写则按积分表配置名次</span>
+        </el-form-item>
         <el-form-item label="分组" prop="groupNo">
           <el-input v-model="formData.groupNo" placeholder="如：A组、B组" />
         </el-form-item>
@@ -105,8 +113,11 @@
           <el-time-picker v-model="formData.startTime" placeholder="选择时间" format="HH:mm" value-format="HH:mm" />
         </el-form-item>
         <el-form-item label="结束时间" prop="endTime">
-          <el-time-picker v-model="formData.endTime" placeholder="选择时间" format="HH:mm" value-format="HH:mm" />
+          <el-time-picker v-model="formData.endTime" placeholder="建议填写结束时间" format="HH:mm" value-format="HH:mm" />
         </el-form-item>
+        <el-alert type="info" :closable="false" show-icon>
+          秩序册只列开始时间时，请根据下一场时间设置合理结束时间。田径场建议细分为“径赛跑道、跳高区、跳远区、投掷区”等比赛区域，以允许不同区域并行比赛。
+        </el-alert>
         <el-form-item label="场地" prop="location">
           <el-input v-model="formData.location" placeholder="请输入比赛场地" />
         </el-form-item>
@@ -154,6 +165,8 @@ const formData = reactive({
   scheduleName: '',
   roundNo: 1,
   roundType: 'FINAL',
+  qualificationCount: null as number | null,
+  awardCount: null as number | null,
   groupNo: '',
   matchDate: '',
   startTime: '',
@@ -247,6 +260,7 @@ function handleAdd() {
   dialogTitle.value = '新增赛程'
   Object.assign(formData, {
     eventId: null, sportItemId: null, scheduleName: '', roundNo: 1, roundType: 'FINAL',
+    qualificationCount: null, awardCount: 8,
     groupNo: '', matchDate: '', startTime: '', endTime: '', location: '', remark: ''
   })
   sportItemOptions.value = []
@@ -260,6 +274,8 @@ async function handleEdit(row: any) {
   await onEventChange(row.eventId)
   formData.sportItemId = row.sportItemId
   formData.roundType = row.roundType || 'FINAL'
+  formData.qualificationCount = row.qualificationCount ?? null
+  formData.awardCount = row.awardCount ?? 8
   dialogVisible.value = true
 }
 
