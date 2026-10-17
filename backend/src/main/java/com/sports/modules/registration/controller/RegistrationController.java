@@ -30,6 +30,7 @@ public class RegistrationController {
 
     @Operation(summary = "学生报名")
     @PostMapping
+    @PreAuthorize("hasRole('STUDENT')")
     public Result<Long> register(@Valid @RequestBody RegistrationDTO dto) {
         Long id = registrationService.register(dto);
         return Result.success("报名成功", id);
@@ -78,8 +79,10 @@ public class RegistrationController {
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long eventId,
             @RequestParam(required = false) Long sportItemId,
-            @RequestParam(required = false) String status) {
-        return Result.success(PageResult.of(registrationService.pageRegistrations(current, size, eventId, sportItemId, status)));
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String college,
+            @RequestParam(required = false) String className) {
+        return Result.success(PageResult.of(registrationService.pageRegistrations(current, size, eventId, sportItemId, status, college, className)));
     }
 
     @Operation(summary = "获取我的报名列表")
