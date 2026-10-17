@@ -42,9 +42,14 @@
       </el-alert>
 
       <div class="toolbar">
-        <el-button type="primary" @click="generateDialogVisible = true" :disabled="!currentSchedule || currentSchedule.status !== 1">
+        <el-button type="primary" @click="generateDialogVisible = true" :disabled="!currentSchedule || currentSchedule.status !== 1 || entryRows.length > 0">
           生成参赛名单
         </el-button>
+        <el-button v-if="!editingPositions" @click="beginPositionEdit" :disabled="!currentSchedule || currentSchedule.status !== 1 || entryRows.length === 0">
+          调整分组分道
+        </el-button>
+        <el-button v-if="editingPositions" type="success" :loading="submitLoading" @click="savePositions">保存分组分道</el-button>
+        <el-button v-if="editingPositions" @click="cancelPositionEdit">取消调整</el-button>
         <el-button @click="openAdvanceDialog" :disabled="!currentSchedule || currentSchedule.status !== 3 || !isTrack">
           按成绩晋级
         </el-button>
@@ -55,9 +60,32 @@
       </div>
 
       <el-table :data="entryRows" v-loading="loading" border stripe>
-        <el-table-column label="组别" prop="groupNo" width="75" />
-        <el-table-column label="道次/顺序" width="95">
-          <template #default="{ row }">{{ row.laneNo ?? row.startOrder ?? '—' }}</template>
+        <el-table-column label="组别" width="100">
+          <template #default="{ row }">
+            <el-input v-if="editingPositions" v-model="row.groupNo" size="small" />
+            <span v-else>{{ groupDisplay(row.groupNo) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="道次/顺序" width="130">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="editingPositions && !isField"
+              v-model="row.laneNo"
+              :min="1"
+              :max="16"
+              :controls="false"
+              size="small"
+            />
+            <el-input-number
+              v-else-if="editingPositions && isField"
+              v-model="row.startOrder"
+              :min="1"
+              :max="1000"
+              :controls="false"
+              size="small"
+            />
+            <span v-else>{{ row.laneNo ?? row.startOrder ?? '—' }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="参赛者/队伍" min-width="150">
           <template #default="{ row }">
@@ -191,6 +219,8 @@ import { get, post, put } from '@/utils/request'
 
 const loading = ref(false)
 const submitLoading = ref(false)
+const editingPositions = ref(false)
+const positionSnapshot = ref<any[]>([])
 const eventOptions = ref<any[]>([])
 const scheduleOptions = ref<any[]>([])
 const sportItemOptions = ref<any[]>([])
@@ -242,6 +272,8 @@ async function onEventChange() {
 
 async function loadEntries() {
   entryRows.value = []
+  editingPositions.value = false
+  positionSnapshot.value = []
   if (!query.scheduleId) return
   loading.value = true
   try {
@@ -250,6 +282,50 @@ async function loadEntries() {
   } finally {
     loading.value = false
   }
+}
+
+function beginPositionEdit() {
+  positionSnapshot.value = JSON.parse(JSON.stringify(entryRows.value))
+  editingPositions.value = true
+}
+
+function cancelPositionEdit() {
+  entryRows.value = JSON.parse(JSON.stringify(positionSnapshot.value))
+  editingPositions.value = false
+  positionSnapshot.value = []
+}
+
+async function savePositions() {
+  if (!query.scheduleId) return
+  const positions = entryRows.value.map((row, index) => ({
+    entryId: row.id,
+    groupNo: String(row.groupNo || '').trim(),
+    laneNo: isField.value ? null : Number(row.laneNo),
+    startOrder: Number(row.startOrder || index + 1)
+  }))
+  if (positions.some(item => !item.groupNo || !Number.isInteger(item.startOrder) || item.startOrder < 1)) {
+    ElMessage.warning('请填写有效的组别和比赛顺序')
+    return
+  }
+  if (!isField.value && positions.some(item => !Number.isInteger(item.laneNo) || Number(item.laneNo) < 1)) {
+    ElMessage.warning('径赛每名参赛者都必须设置有效道次')
+    return
+  }
+  submitLoading.value = true
+  try {
+    await put(`/schedules/${query.scheduleId}/entries/positions`, positions)
+    ElMessage.success('已按秩序册保存分组、道次和比赛顺序')
+    editingPositions.value = false
+    positionSnapshot.value = []
+    await loadEntries()
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+function groupDisplay(value: string | number) {
+  const text = String(value ?? '')
+  return /^\\d+$/.test(text) ? `第${text}组` : text || '—'
 }
 
 async function generateEntries() {
