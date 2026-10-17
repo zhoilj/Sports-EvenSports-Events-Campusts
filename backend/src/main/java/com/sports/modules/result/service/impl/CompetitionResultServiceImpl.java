@@ -215,6 +215,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
                 .eq(CompetitionResult::getScheduleId, scheduleId));
         Map<String, CompetitionResult> resultByParticipant = results.stream()
                 .collect(Collectors.toMap(this::participantKey, r -> r, (left, right) -> left));
+        Map<String, String> checkinStatusByParticipant = new HashMap<>();
         for (ScheduleEntry entry : entries) {
             CheckinRecord checkin = checkinRecordMapper.selectOne(new LambdaQueryWrapper<CheckinRecord>()
                     .eq(CheckinRecord::getScheduleEntryId, entry.getId()));
@@ -223,6 +224,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
             }
             String key = entry.getRegistrationId() != null
                     ? "R:" + entry.getRegistrationId() : "T:" + entry.getRelayTeamId();
+            checkinStatusByParticipant.put(key, checkin.getStatus());
             CompetitionResult result = resultByParticipant.get(key);
             if (result == null) {
                 throw new BusinessException("参赛名单尚有未录入成绩的选手/队伍，不能发布正式成绩");
@@ -240,6 +242,8 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
 
         boolean scoringRound = "FINAL".equalsIgnoreCase(schedule.getRoundType())
                 || "FIELD_FINAL".equalsIgnoreCase(schedule.getRoundType());
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        if (item == null) throw new BusinessException("成绩所属项目不存在");
         Map<Integer, Integer> pointsByPlace = scoringRuleMapper.selectList(new LambdaQueryWrapper<ScoringRule>()
                         .eq(ScoringRule::getEventId, schedule.getEventId()))
                 .stream().collect(Collectors.toMap(ScoringRule::getPlaceNo, ScoringRule::getPoints, (a, b) -> a));
@@ -249,12 +253,28 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         if (results.stream().anyMatch(r -> Objects.equals(r.getIsPublished(), 1))) {
             throw new BusinessException("该赛程已有正式发布的成绩，不能重复发布");
         }
+        int multiplier = item.getScoringMultiplier() == null || item.getScoringMultiplier() < 1
+                ? (Objects.equals(item.getIsRelay(), 1) ? 2 : 1) : item.getScoringMultiplier();
+        int recordPoints = item.getRecordPoints() == null ? 9 : item.getRecordPoints();
+        int participationPoints = item.getParticipationPoints() == null ? 0 : item.getParticipationPoints();
         LocalDateTime now = LocalDateTime.now();
         Long operator = SecurityUtils.getUserId();
         for (CompetitionResult result : results) {
             CompetitionResult before = copyResult(result);
-            result.setPoints(scoringRound && "VALID".equals(result.getResultStatus()) && result.getRanking() != null
-                    ? pointsByPlace.getOrDefault(result.getRanking(), 0) : 0);
+            int placePoints = 0;
+            if (scoringRound && "VALID".equals(result.getResultStatus())) {
+                if (Objects.equals(result.getIsRecord(), 1)) {
+                    placePoints = recordPoints;
+                } else if (result.getRanking() != null
+                        && (schedule.getAwardCount() == null || result.getRanking() <= schedule.getAwardCount())) {
+                    placePoints = pointsByPlace.getOrDefault(result.getRanking(), 0);
+                }
+            }
+            String checkinStatus = checkinStatusByParticipant.get(participantKey(result));
+            boolean participated = "CHECKED_IN".equals(checkinStatus)
+                    && !"DNS".equals(result.getResultStatus()) && !"WD".equals(result.getResultStatus());
+            int participation = participated ? participationPoints : 0;
+            result.setPoints(scoringRound ? placePoints * multiplier + participation : 0);
             result.setIsPublished(1);
             result.setPublishedBy(operator);
             result.setPublishedAt(now);
@@ -320,6 +340,13 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
             throw new BusinessException("成绩状态无效");
         }
         result.setResultStatus(resultStatus);
+        if (result.getIsRecord() == null) result.setIsRecord(0);
+        if (result.getIsRecord() != 0 && result.getIsRecord() != 1) {
+            throw new BusinessException("破纪录标记无效");
+        }
+        if (Objects.equals(result.getIsRecord(), 1) && !"VALID".equals(resultStatus)) {
+            throw new BusinessException("只有有效成绩可以标记为破纪录");
+        }
 
         if (result.getRelayTeamId() != null) {
             if (result.getRegistrationId() != null) throw new BusinessException("接力成绩不能同时关联个人报名记录");
@@ -482,6 +509,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
                 + ",\"score\":" + (result.getScore() == null ? "null" : result.getScore().toPlainString())
                 + ",\"scoreText\":" + jsonString(result.getScoreText())
                 + ",\"resultStatus\":" + jsonString(result.getResultStatus())
+                + ",\"isRecord\":" + jsonNumber(result.getIsRecord())
                 + ",\"ranking\":" + jsonNumber(result.getRanking())
                 + ",\"points\":" + jsonNumber(result.getPoints())
                 + ",\"reviewStatus\":" + jsonNumber(result.getReviewStatus())
