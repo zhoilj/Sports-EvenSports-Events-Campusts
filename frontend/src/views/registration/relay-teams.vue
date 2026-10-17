@@ -68,7 +68,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="接力项目" prop="sportItemId">
-          <el-select v-model="formData.sportItemId" placeholder="请选择接力项目" filterable :disabled="!!editingTeamId" @change="loadEligibleMembers">
+          <el-select v-model="formData.sportItemId" placeholder="请选择接力项目" filterable :disabled="!!editingTeamId" @change="onItemChange">
             <el-option v-for="item in relayItems" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
         </el-form-item>
@@ -232,13 +232,13 @@ async function onEventChange(eventId: number) {
     relayItems.value = (res.data.records || []).filter((item: any) => item.isRelay === 1 && item.status === 1)
     if (relayItems.value.length === 1) {
       formData.sportItemId = relayItems.value[0].id
-      loadEligibleMembers()
+      loadEligibleMembers('', true)
     }
   }
 }
 
-async function loadEligibleMembers(keyword = '') {
-  formData.memberUserIds = []
+async function loadEligibleMembers(keyword = '', resetSelection = false) {
+  if (resetSelection) formData.memberUserIds = []
   membersLoading.value = true
   try {
     const res = await get('/relay-teams/eligible-members', { keyword })
@@ -250,8 +250,12 @@ async function loadEligibleMembers(keyword = '') {
   }
 }
 
+async function onItemChange() {
+  await loadEligibleMembers('', true)
+}
+
 async function searchMembers(keyword: string) {
-  await loadEligibleMembers(keyword)
+  await loadEligibleMembers(keyword, false)
 }
 
 async function openEdit(row: any) {
@@ -264,7 +268,7 @@ async function openEdit(row: any) {
   })
   await onEventChange(row.eventId)
   formData.sportItemId = row.sportItemId
-  await loadEligibleMembers()
+  await loadEligibleMembers('', false)
   formData.memberUserIds = (row.members || []).filter((m: any) => m.userId !== currentUserId.value).map((m: any) => m.userId)
   dialogVisible.value = true
 }
