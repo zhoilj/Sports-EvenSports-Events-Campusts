@@ -45,12 +45,6 @@ SET division = CASE
   WHEN item_name LIKE '%甲组%' THEN 'A'
   WHEN item_name LIKE '%乙组%' THEN 'B'
   WHEN item_name LIKE '%教工组%' THEN 'STAFF'
-  WHEN item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
-    OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
-    OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%背篓接绣球%'
-    OR item_name LIKE '%校园越野跑%' OR item_name LIKE '%车轮滚滚%' OR item_name LIKE '%旱地龙舟%'
-    OR item_name LIKE '%袋鼠跳%' OR item_name LIKE '%滚铁环%' OR item_name LIKE '%企鹅漫步%'
-    OR item_name LIKE '%协同大转盘%' THEN 'A'
   ELSE division
 END
 WHERE division = 'OPEN';
