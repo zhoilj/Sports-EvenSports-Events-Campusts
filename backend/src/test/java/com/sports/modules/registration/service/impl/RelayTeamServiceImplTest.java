@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class RelayTeamServiceImplTest {
 
-    private final RelayTeamServiceImpl service = new RelayTeamServiceImpl(null, null, null, null, null);
+    private final RelayTeamServiceImpl service = new RelayTeamServiceImpl(null, null, null, null);
 
     @Test
     void automaticallyAddsCaptainAndPreservesRelayOrder() {
