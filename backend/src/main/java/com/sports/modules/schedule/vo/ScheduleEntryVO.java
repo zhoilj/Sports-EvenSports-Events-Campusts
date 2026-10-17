@@ -15,6 +15,7 @@ public class ScheduleEntryVO {
     private String checkinCode;
     private String eventName;
     private String sportItemName;
+    private String competitionGroup;
     private String scheduleName;
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate matchDate;
