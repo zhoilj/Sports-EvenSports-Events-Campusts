@@ -163,7 +163,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         for (int i = 0; i < candidates.size(); i++) {
             ScheduleEntry entry = candidates.get(i);
             entry.setStartOrder(i + 1);
-            entry.setGroupNo(field ? "A" : groupLabel(i / perGroup));
+            entry.setGroupNo(field ? "田赛顺序" : groupLabel(i / perGroup));
             entry.setLaneNo(field ? null : (i % perGroup) + 1);
         }
         List<ScheduleConflictVO> conflicts = findConflicts(schedule, candidates);
