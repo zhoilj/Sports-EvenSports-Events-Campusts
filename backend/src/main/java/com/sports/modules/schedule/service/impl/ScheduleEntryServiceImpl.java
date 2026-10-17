@@ -81,17 +81,17 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
                         .eq(Registration::getStatus, 2))
                 .stream().map(Registration::getId).collect(Collectors.toList());
 
-        List<Long> teamIds = relayTeamMemberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+        List<Long> memberTeamIds = relayTeamMemberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
                         .eq(RelayTeamMember::getUserId, userId))
                 .stream().map(RelayTeamMember::getTeamId).distinct().collect(Collectors.toList());
-        if (!teamIds.isEmpty()) {
-            teamIds = relayTeamMapper.selectList(new LambdaQueryWrapper<RelayTeam>()
-                            .in(RelayTeam::getId, teamIds)
-                            .eq(RelayTeam::getStatus, 2))
-                    .stream().map(RelayTeam::getId).collect(Collectors.toList());
-        }
+        List<Long> approvedTeamIds = memberTeamIds.isEmpty()
+                ? List.of()
+                : relayTeamMapper.selectList(new LambdaQueryWrapper<RelayTeam>()
+                                .in(RelayTeam::getId, memberTeamIds)
+                                .eq(RelayTeam::getStatus, 2))
+                        .stream().map(RelayTeam::getId).collect(Collectors.toList());
 
-        if (registrationIds.isEmpty() && teamIds.isEmpty()) {
+        if (registrationIds.isEmpty() && approvedTeamIds.isEmpty()) {
             return List.of();
         }
 
@@ -100,11 +100,11 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             if (!registrationIds.isEmpty()) {
                 condition.in(ScheduleEntry::getRegistrationId, registrationIds);
             }
-            if (!teamIds.isEmpty()) {
+            if (!approvedTeamIds.isEmpty()) {
                 if (!registrationIds.isEmpty()) {
                     condition.or();
                 }
-                condition.in(ScheduleEntry::getRelayTeamId, teamIds);
+                condition.in(ScheduleEntry::getRelayTeamId, approvedTeamIds);
             }
         }).orderByAsc(ScheduleEntry::getId);
 
