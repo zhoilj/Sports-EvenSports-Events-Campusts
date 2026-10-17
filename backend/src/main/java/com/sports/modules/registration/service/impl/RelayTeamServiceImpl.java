@@ -356,13 +356,44 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
                 case "MIXED_15M15F" -> formalCount == 30 && maleCount == 15 && femaleCount == 15;
                 case "MIXED_3M3F" -> formalCount == 6 && maleCount == 3 && femaleCount == 3;
                 case "MIXED_6M4F" -> formalCount == 10 && maleCount == 6 && femaleCount == 4;
-                case "MIXED_MIN_6F" -> formalCount == 18 && femaleCount >= 6 && maleCount + femaleCount == formalCount;
+                case "MIXED_2M2F_MIN" -> formalCount == 5 && maleCount >= 2 && femaleCount >= 2
+                        && maleCount + femaleCount == formalCount;
+                case "PAIRS_1M1F" -> validMixedPairs(formalMembers);
+                case "MIXED_MIN_6F" -> validBoardShoeGroups(formalMembers);
                 default -> true;
             };
             if (!valid) {
                 throw new BusinessException("参赛队员性别构成不符合项目规程（当前男" + maleCount + "人、女" + femaleCount + "人；规则：" + rule + "）");
             }
         }
+    }
+
+    private boolean validMixedPairs(List<Long> formalMembers) {
+        if (formalMembers.size() != 20 || formalMembers.size() % 2 != 0) return false;
+        for (int i = 0; i < formalMembers.size(); i += 2) {
+            SysUser first = sysUserService.getById(formalMembers.get(i));
+            SysUser second = sysUserService.getById(formalMembers.get(i + 1));
+            if (first == null || second == null || first.getGender() == null || second.getGender() == null
+                    || Objects.equals(first.getGender(), second.getGender())
+                    || !Set.of(1, 2).contains(first.getGender()) || !Set.of(1, 2).contains(second.getGender())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validBoardShoeGroups(List<Long> formalMembers) {
+        if (formalMembers.size() != 18) return false;
+        for (int start = 0; start < formalMembers.size(); start += 3) {
+            int femaleCount = 0;
+            for (int i = start; i < start + 3; i++) {
+                SysUser user = sysUserService.getById(formalMembers.get(i));
+                if (user == null || user.getGender() == null || !Set.of(1, 2).contains(user.getGender())) return false;
+                if (Objects.equals(user.getGender(), 2)) femaleCount++;
+            }
+            if (femaleCount < 1) return false;
+        }
+        return true;
     }
 
     private List<Long> arrangeMixedRelayRoster(List<Long> roster, SportItem item) {
