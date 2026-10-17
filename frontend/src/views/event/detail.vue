@@ -224,15 +224,14 @@ function goBack() {
   router.push('/events')
 }
 
-function getStatusType(status: string) {
+function getStatusType(status: string | number) {
   const map: Record<string, string> = {
-    DRAFT: 'info',
-    PUBLISHED: 'primary',
-    ONGOING: 'success',
-    ENDED: 'warning',
-    CANCELLED: 'danger'
+    '1': 'info',
+    '2': 'primary',
+    '3': 'success',
+    '4': 'warning'
   }
-  return map[status] || 'info'
+  return map[String(status)] || 'info'
 }
 
 function getScheduleStatusType(status: string) {

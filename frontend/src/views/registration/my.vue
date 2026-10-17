@@ -31,7 +31,7 @@
         <el-table-column prop="teamName" label="队伍名称" width="140" />
         <el-table-column label="接力队员" min-width="220">
           <template #default="{ row }">
-            {{ row.members?.length ? row.members.map((member: any) => member.realName).join('、') : '—' }}
+            {{ row.members?.length ? row.members.map((member) => member.realName).join('、') : '—' }}
           </template>
         </el-table-column>
         <el-table-column prop="statusName" label="状态" width="100">

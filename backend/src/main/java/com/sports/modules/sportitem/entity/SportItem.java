@@ -70,7 +70,7 @@ public class SportItem extends BaseEntity {
      */
     @TableField("participation_mode")
     @Pattern(regexp = "INDIVIDUAL|RELAY", message = "参赛模式只能为 INDIVIDUAL 或 RELAY")
-    private String participationMode = "INDIVIDUAL";
+    private String participationMode;
 
     /**
      * 接力项目要求的队员人数；个人项目为空
