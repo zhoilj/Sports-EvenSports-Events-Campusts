@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -222,6 +223,7 @@ public class SportItemController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Long> create(@Valid @RequestBody SportItem sportItem) {
+        validateCompetitionGroup(sportItem);
         // 设置默认值
         if (sportItem.getStatus() == null) {
             sportItem.setStatus(1);
@@ -242,8 +244,17 @@ public class SportItemController {
             throw new BusinessException(ResultCode.SPORT_ITEM_NOT_FOUND);
         }
         sportItem.setId(id);
+        validateCompetitionGroup(sportItem);
         sportItemService.updateById(sportItem);
         return Result.success();
+    }
+
+    private void validateCompetitionGroup(SportItem item) {
+        if ("TRACK".equalsIgnoreCase(item.getType()) || "FIELD".equalsIgnoreCase(item.getType())) {
+            if (!"A".equals(item.getCompetitionGroup()) && !"B".equals(item.getCompetitionGroup())) {
+                throw new BusinessException("径赛和田赛项目必须明确配置甲组（普通本科组）或乙组（体育专业组）");
+            }
+        }
     }
 
     @Operation(summary = "删除运动项目")
