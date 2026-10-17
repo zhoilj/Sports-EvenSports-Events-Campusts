@@ -19,13 +19,12 @@
         <el-form-item>
           <el-button type="primary" @click="loadAll" :disabled="!eventId">刷新</el-button>
         </el-form-item>
+        <el-form-item label="排名类别">
+          <el-select v-model="categoryFilter" placeholder="选择排名类别" style="width: 220px">
+            <el-option v-for="category in categories" :key="category" :label="category" :value="category" />
+          </el-select>
+        </el-form-item>
       </el-form>
-
-      <el-form-item label="排名类别">
-        <el-select v-model="categoryFilter" placeholder="选择排名类别" style="width: 220px">
-          <el-option v-for="category in categories" :key="category" :label="category" :value="category" />
-        </el-select>
-      </el-form-item>
       <el-table :data="filteredStandings" v-loading="loading" border stripe>
         <el-table-column label="排名" width="80">
           <template #default="{ row }">
