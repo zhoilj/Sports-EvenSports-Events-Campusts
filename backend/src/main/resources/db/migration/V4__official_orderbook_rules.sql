@@ -89,11 +89,8 @@ WHERE scoring_multiplier = 1
 UPDATE sport_item
 SET participation_points = 3
 WHERE participation_points = 0
-  AND (item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
-   OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
-   OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%背篓接绣球%'
-   OR item_name LIKE '%校园越野跑%' OR item_name LIKE '%车轮滚滚%' OR item_name LIKE '%旱地龙舟%'
+  AND (item_name LIKE '%趣味%' OR item_name LIKE '%车轮滚滚%' OR item_name LIKE '%旱地龙舟%'
    OR item_name LIKE '%袋鼠跳%' OR item_name LIKE '%滚铁环%' OR item_name LIKE '%企鹅漫步%'
-   OR item_name LIKE '%协同大转盘%');
+   OR item_name LIKE '%协同大转盘%' OR item_name LIKE '%集体跳长绳%');
 
 UPDATE sport_item SET record_points = 9 WHERE record_points IS NULL OR record_points < 0;
