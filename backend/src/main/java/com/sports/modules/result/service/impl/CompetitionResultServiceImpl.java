@@ -91,11 +91,20 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void batchSaveResults(List<CompetitionResult> results) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+        Long eventId = results.get(0).getEventId();
+        Long sportItemId = results.get(0).getSportItemId();
         for (CompetitionResult result : results) {
+            if (!java.util.Objects.equals(eventId, result.getEventId())
+                    || !java.util.Objects.equals(sportItemId, result.getSportItemId())) {
+                throw new BusinessException("批量录入成绩必须属于同一赛事和项目");
+            }
             prepareAndValidateResult(result);
         }
         this.saveBatch(results);
-        recalculateRankings(results.get(0).getEventId(), results.get(0).getSportItemId());
+        recalculateRankings(eventId, sportItemId);
     }
 
     /**
@@ -141,8 +150,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         if (item == null) {
             return;
         }
-        boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType())
-                || "ASC".equalsIgnoreCase(item.getRules());
+        boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType());
         List<CompetitionResult> ranked = this.list(new LambdaQueryWrapper<CompetitionResult>()
                 .eq(CompetitionResult::getEventId, eventId)
                 .eq(CompetitionResult::getSportItemId, sportItemId)
