@@ -123,8 +123,8 @@ public class FieldAttemptServiceImpl extends ServiceImpl<FieldAttemptMapper, Fie
                 .eq(ScheduleEntry::getScheduleId, scheduleId));
         if (entries.isEmpty()) throw new BusinessException("该赛程尚未生成参赛名单");
         SportItem item = sportItemService.getById(schedule.getSportItemId());
-        boolean ascending = "ASC".equalsIgnoreCase(item.getSortRule())
-                || (item.getSortRule() == null && "TIME".equalsIgnoreCase(item.getScoreType()));
+        boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType())
+                || "ASC".equalsIgnoreCase(item.getSortRule());
         int finalized = 0;
         for (ScheduleEntry entry : entries) {
             CheckinRecord checkin = checkinRecordMapper.selectOne(new LambdaQueryWrapper<CheckinRecord>()
