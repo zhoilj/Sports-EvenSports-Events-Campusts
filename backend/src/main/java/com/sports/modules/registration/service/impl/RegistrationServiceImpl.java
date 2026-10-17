@@ -92,6 +92,16 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "仅状态正常的学生账号可以报名");
         }
 
+        if (!isValidCompetitionGroup(user.getCompetitionGroup())) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "学生参赛组别尚未由管理员核定，请联系学院或赛事管理员");
+        }
+        if (!isValidCompetitionGroup(sportItem.getCompetitionGroup())) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "该项目尚未配置甲组/乙组，暂不能报名");
+        }
+        if (!user.getCompetitionGroup().equals(sportItem.getCompetitionGroup())) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "学生参赛组别与项目组别不一致，不能跨组报名");
+        }
+
         Integer genderLimit = sportItem.getGenderLimit();
         if (genderLimit != null && genderLimit != 0 && !genderLimit.equals(user.getGender())) {
             throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED,
@@ -142,6 +152,7 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
         registration.setEventId(dto.getEventId());
         registration.setSportItemId(dto.getSportItemId());
         registration.setUserId(userId);
+        registration.setCompetitionGroup(user.getCompetitionGroup());
         registration.setStatus(1);
         registration.setRemark(dto.getRemark());
         this.save(registration);
@@ -194,6 +205,16 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             statusCode = 3;
         } else {
             throw new BusinessException("不支持的报名审核状态");
+        }
+        if (statusCode == 2) {
+            SportItem item = sportItemService.getById(registration.getSportItemId());
+            SysUser student = sysUserService.getById(registration.getUserId());
+            if (item == null || student == null || !isValidCompetitionGroup(item.getCompetitionGroup())
+                    || !isValidCompetitionGroup(student.getCompetitionGroup())
+                    || !item.getCompetitionGroup().equals(student.getCompetitionGroup())) {
+                throw new BusinessException("报名审核未通过：请先核定学生甲/乙组，并确保与项目组别一致");
+            }
+            registration.setCompetitionGroup(item.getCompetitionGroup());
         }
         registration.setStatus(statusCode);
         registration.setReviewerId(SecurityUtils.getUserId());
@@ -356,6 +377,10 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
                 .in(Registration::getStatus, 1, 2));
         item.setCurrentParticipants(Math.toIntExact(activeCount));
         sportItemService.updateById(item);
+    }
+
+    private boolean isValidCompetitionGroup(String group) {
+        return "A".equals(group) || "B".equals(group);
     }
 
     private Integer parseStatus(String status) {
