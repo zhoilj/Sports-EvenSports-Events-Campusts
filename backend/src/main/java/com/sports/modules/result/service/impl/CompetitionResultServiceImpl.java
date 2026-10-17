@@ -96,15 +96,17 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         }
         Long eventId = results.get(0).getEventId();
         Long sportItemId = results.get(0).getSportItemId();
+        Long scheduleId = results.get(0).getScheduleId();
         for (CompetitionResult result : results) {
             if (!java.util.Objects.equals(eventId, result.getEventId())
-                    || !java.util.Objects.equals(sportItemId, result.getSportItemId())) {
-                throw new BusinessException("批量录入成绩必须属于同一赛事和项目");
+                    || !java.util.Objects.equals(sportItemId, result.getSportItemId())
+                    || !java.util.Objects.equals(scheduleId, result.getScheduleId())) {
+                throw new BusinessException("批量录入成绩必须属于同一赛事、项目和场次");
             }
             prepareAndValidateResult(result);
         }
         this.saveBatch(results);
-        recalculateRankings(eventId, sportItemId);
+        recalculateRankings(eventId, sportItemId, results.get(0).getScheduleId());
     }
 
     /**
@@ -114,7 +116,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     public void saveValidatedResult(CompetitionResult result) {
         prepareAndValidateResult(result);
         this.saveOrUpdate(result);
-        recalculateRankings(result.getEventId(), result.getSportItemId());
+        recalculateRankings(result.getEventId(), result.getSportItemId(), result.getScheduleId());
     }
 
     private void prepareAndValidateResult(CompetitionResult result) {
@@ -142,7 +144,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
      * Track times sort ascending; distance/score sort descending.
      * Equal scores share a place (1, 1, 3).
      */
-    private void recalculateRankings(Long eventId, Long sportItemId) {
+    private void recalculateRankings(Long eventId, Long sportItemId, Long scheduleId) {
         if (eventId == null || sportItemId == null) {
             return;
         }
@@ -151,10 +153,16 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
             return;
         }
         boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType());
-        List<CompetitionResult> ranked = this.list(new LambdaQueryWrapper<CompetitionResult>()
+        LambdaQueryWrapper<CompetitionResult> rankingQuery = new LambdaQueryWrapper<CompetitionResult>()
                 .eq(CompetitionResult::getEventId, eventId)
                 .eq(CompetitionResult::getSportItemId, sportItemId)
-                .isNotNull(CompetitionResult::getScore));
+                .isNotNull(CompetitionResult::getScore);
+        if (scheduleId == null) {
+            rankingQuery.isNull(CompetitionResult::getScheduleId);
+        } else {
+            rankingQuery.eq(CompetitionResult::getScheduleId, scheduleId);
+        }
+        List<CompetitionResult> ranked = this.list(rankingQuery);
         Comparator<CompetitionResult> comparator = Comparator.comparing(CompetitionResult::getScore);
         if (!ascending) {
             comparator = comparator.reversed();
