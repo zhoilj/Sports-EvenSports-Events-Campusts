@@ -67,6 +67,7 @@ public class SportItemController {
         if (sportItem.getTeamMemberCount() == null) sportItem.setTeamMemberCount(0);
         if (sportItem.getTeamReserveCount() == null) sportItem.setTeamReserveCount(0);
         if (sportItem.getMaxTeamsPerCollege() == null) sportItem.setMaxTeamsPerCollege(1);
+        if (sportItem.getTeamRosterRule() == null) sportItem.setTeamRosterRule("ANY");
         if (sportItem.getDivision() == null) sportItem.setDivision("OPEN");
         if (sportItem.getGenderCategory() == null) sportItem.setGenderCategory("OPEN");
         if (sportItem.getRoundPolicy() == null) sportItem.setRoundPolicy("FINAL_ONLY");
@@ -118,6 +119,7 @@ public class SportItemController {
             }
             if (item.getTeamReserveCount() == null) item.setTeamReserveCount(0);
             item.setMaxTeamsPerCollege(defaultMaxTeamsPerCollege(name));
+            item.setTeamRosterRule(defaultTeamRosterRule(name, Integer.valueOf(1).equals(item.getIsRelay())));
             item.setGenderCategory(mixedRelay ? "MIXED" : name.contains("男子") ? "MALE"
                     : name.contains("女子") ? "FEMALE" : Integer.valueOf(1).equals(item.getGenderLimit()) ? "MALE"
                     : Integer.valueOf(2).equals(item.getGenderLimit()) ? "FEMALE" : "OPEN");
@@ -136,6 +138,22 @@ public class SportItemController {
             updated++;
         }
         return Result.success("已匹配默认规则，请逐项对照秩序册复核", updated);
+    }
+
+    private String defaultTeamRosterRule(String name, boolean relay) {
+        if (relay && (name.contains("混合接力") || name.contains("混合"))) return "MIXED_RELAY_LEGS";
+        if (relay && name.contains("男子")) return "MALE_ONLY";
+        if (relay && name.contains("女子")) return "FEMALE_ONLY";
+        if (name.contains("校园越野跑")) return "CUSTOM";
+        if (name.contains("和谐共进")) return "MIXED_5M5F";
+        if (name.contains("两人三足") || name.contains("拔河") || name.contains("集体跳长绳")
+                || name.contains("袋鼠跳")) return "MIXED_10M10F";
+        if (name.contains("车轮滚滚") || name.contains("旱地龙舟")
+                || name.contains("滚铁环") || name.contains("企鹅漫步")) return "MIXED_5M5F";
+        if (name.contains("协同大转盘")) return "MIXED_15M15F";
+        if (name.contains("三人板鞋")) return "MIXED_MIN_6F";
+        if (name.contains("高杆绣球") || name.contains("背篓接绣球") || name.contains("抛绣球")) return "MIXED_3M3F";
+        return "ANY";
     }
 
     private int defaultTeamMemberCount(String name) {
