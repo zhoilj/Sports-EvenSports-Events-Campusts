@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
 public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, ScheduleEntry>
         implements ScheduleEntryService {
 
-    private static final int TRANSITION_BUFFER_SECONDS = 600;
+    private static final int TRANSITION_BUFFER_SECONDS = 300;
 
     private final ScheduleService scheduleService;
     private final SportItemService sportItemService;
@@ -440,14 +440,14 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
         }
 
-        int targetStart = seconds(schedule.getStartTime()) - TRANSITION_BUFFER_SECONDS;
+        int targetStart = seconds(schedule.getStartTime());
         int targetEnd = seconds(effectiveEnd(schedule)) + TRANSITION_BUFFER_SECONDS;
         List<Schedule> sameDay = scheduleService.list(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getMatchDate, schedule.getMatchDate())
                 .ne(Schedule::getId, schedule.getId())
                 .ne(Schedule::getStatus, 4));
         for (Schedule other : sameDay) {
-            int otherStart = seconds(other.getStartTime()) - TRANSITION_BUFFER_SECONDS;
+            int otherStart = seconds(other.getStartTime());
             int otherEnd = seconds(effectiveEnd(other)) + TRANSITION_BUFFER_SECONDS;
             if (targetStart >= otherEnd || otherStart >= targetEnd) continue;
             List<ScheduleEntry> existingEntries = this.list(new LambdaQueryWrapper<ScheduleEntry>()
@@ -520,7 +520,11 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
 
     private LocalTime effectiveEnd(Schedule schedule) {
         if (schedule.getEndTime() != null) return schedule.getEndTime();
-        return schedule.getStartTime().plusHours(1);
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        int minutes = 30;
+        if (item != null && "TRACK".equalsIgnoreCase(item.getType())) minutes = 5;
+        else if (item != null && "FIELD".equalsIgnoreCase(item.getType())) minutes = 90;
+        return schedule.getStartTime().plusMinutes(minutes);
     }
 
     private int seconds(LocalTime time) {
