@@ -261,8 +261,8 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         }
 
         SportItem item = sportItemService.getById(source.getSportItemId());
-        boolean ascending = "ASC".equalsIgnoreCase(item.getSortRule())
-                || (item.getSortRule() == null && "TIME".equalsIgnoreCase(item.getScoreType()));
+        boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType())
+                || "ASC".equalsIgnoreCase(item.getSortRule());
         List<ScheduleEntry> sourceEntries = this.list(new LambdaQueryWrapper<ScheduleEntry>()
                 .eq(ScheduleEntry::getScheduleId, source.getId()));
         Map<String, ScheduleEntry> entryMap = sourceEntries.stream()
