@@ -166,6 +166,8 @@
               <el-option label="10男10女" value="MIXED_10M10F" />
               <el-option label="15男15女" value="MIXED_15M15F" />
               <el-option label="3男3女" value="MIXED_3M3F" />
+              <el-option label="至少2男2女（共5人）" value="MIXED_2M2F_MIN" />
+              <el-option label="两人三足：每组1男1女" value="PAIRS_1M1F" />
               <el-option label="6男4女" value="MIXED_6M4F" />
               <el-option label="至少6名女生（仍需分组人工核验）" value="MIXED_MIN_6F" />
               <el-option label="按专项规程人工核验" value="CUSTOM" />
