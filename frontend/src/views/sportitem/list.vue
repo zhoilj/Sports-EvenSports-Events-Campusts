@@ -50,7 +50,7 @@
         </el-table-column>
         <el-table-column prop="currentParticipants" label="有效报名" width="100" />
         <el-table-column prop="isRelay" label="项目形式" width="100">
-          <template #default="{ row }">{{ row.isRelay === 1 ? '接力项目' : '个人项目' }}</template>
+          <template #default="{ row }">{{ row.isRelay === 1 ? '接力项目' : row.isTeamEvent === 1 ? '集体队伍项目' : '个人项目' }}</template>
         </el-table-column>
         <el-table-column prop="rules" label="比赛规则" min-width="200" show-overflow-tooltip />
         <el-table-column label="操作" width="150" fixed="right">
@@ -142,6 +142,21 @@
         <el-form-item label="接力项目">
           <el-switch v-model="formData.isRelay" :active-value="1" :inactive-value="0" @change="onRelayChange" />
         </el-form-item>
+        <el-form-item label="集体/民体/趣味项目">
+          <el-switch v-model="formData.isTeamEvent" :active-value="1" :inactive-value="0" :disabled="formData.isRelay === 1" />
+          <span class="form-tip">用于学院队伍参赛，不按单个学生录入成绩</span>
+        </el-form-item>
+        <template v-if="formData.isTeamEvent === 1 && formData.isRelay !== 1">
+          <el-form-item label="队伍人数" prop="teamMemberCount">
+            <el-input-number v-model="formData.teamMemberCount" :min="1" :max="100" />
+          </el-form-item>
+          <el-form-item label="替补人数" prop="teamReserveCount">
+            <el-input-number v-model="formData.teamReserveCount" :min="0" :max="30" />
+          </el-form-item>
+          <el-form-item label="每学院队数" prop="maxTeamsPerCollege">
+            <el-input-number v-model="formData.maxTeamsPerCollege" :min="1" :max="10" />
+          </el-form-item>
+        </template>
         <template v-if="formData.isRelay === 1">
           <el-form-item label="正式队员数" prop="relayMemberCount">
             <el-input-number v-model="formData.relayMemberCount" :min="2" :max="12" />
@@ -198,6 +213,10 @@ const formData = reactive({
   genderLimit: 0,
   maxParticipants: 100,
   isRelay: 0,
+  isTeamEvent: 0,
+  teamMemberCount: 0,
+  teamReserveCount: 0,
+  maxTeamsPerCollege: 1,
   relayMemberCount: 4,
   relayReserveCount: 0,
   rules: ''
@@ -264,6 +283,7 @@ function handleAdd() {
     division: 'OPEN', genderCategory: 'OPEN', roundPolicy: 'FINAL_ONLY',
     scoringMultiplier: 1, participationPoints: 0, recordPoints: 9,
     genderLimit: 0, maxParticipants: 100, isRelay: 0,
+    isTeamEvent: 0, teamMemberCount: 0, teamReserveCount: 0, maxTeamsPerCollege: 1,
     relayMemberCount: 4, relayReserveCount: 0, rules: ''
   })
   dialogVisible.value = true
@@ -278,6 +298,7 @@ function handleEdit(row: any) {
 
 function onRelayChange(value: string | number | boolean) {
   const relay = Number(value) === 1
+  formData.isTeamEvent = relay ? 1 : 0
   if (relay && formData.scoringMultiplier === 1) formData.scoringMultiplier = 2
   if (!relay && formData.scoringMultiplier === 2) formData.scoringMultiplier = 1
 }
