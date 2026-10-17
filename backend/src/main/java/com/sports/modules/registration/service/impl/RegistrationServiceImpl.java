@@ -197,14 +197,9 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
         registration.setReviewRemark(remark);
 
         this.updateById(registration);
-
-        // 如果拒绝(3)，减少报名人数
-        if (statusCode == 3) {
-            SportItem sportItem = sportItemService.getById(registration.getSportItemId());
-            if (sportItem != null && sportItem.getCurrentParticipants() > 0) {
-                sportItem.setCurrentParticipants(sportItem.getCurrentParticipants() - 1);
-                sportItemService.updateById(sportItem);
-            }
+        SportItem sportItem = sportItemService.getById(registration.getSportItemId());
+        if (sportItem != null) {
+            updateParticipantCount(sportItem);
         }
     }
 
@@ -254,7 +249,7 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
         wrapper.eq(Registration::getEventId, eventId)
                 .eq(Registration::getSportItemId, sportItemId)
                 .eq(Registration::getUserId, userId)
-                .ne(Registration::getStatus, 4);  // 4-已取消
+                .in(Registration::getStatus, 1, 2);
 
         return this.count(wrapper) > 0;
     }
@@ -331,6 +326,18 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             vo.setStatusName(getStatusName(registration.getStatus()));
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    /**
+     * Recalculate rather than increment/decrement a counter so retries and status transitions do not drift.
+     * The caller runs inside a transaction and holds the sport-item row lock when creating registrations.
+     */
+    private void updateParticipantCount(SportItem item) {
+        long activeCount = this.count(new LambdaQueryWrapper<Registration>()
+                .eq(Registration::getSportItemId, item.getId())
+                .in(Registration::getStatus, 1, 2));
+        item.setCurrentParticipants(Math.toIntExact(activeCount));
+        sportItemService.updateById(item);
     }
 
     private Integer parseStatus(String status) {
