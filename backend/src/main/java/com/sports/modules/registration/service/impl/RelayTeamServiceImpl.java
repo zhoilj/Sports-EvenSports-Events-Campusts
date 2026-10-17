@@ -88,13 +88,20 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
 
         int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
                 ? 1 : item.getMaxTeamsPerCollege();
-        long collegeTeams = this.count(new LambdaQueryWrapper<RelayTeam>()
+        LambdaQueryWrapper<RelayTeam> collegeTeamQuery = new LambdaQueryWrapper<RelayTeam>()
                 .eq(RelayTeam::getEventId, dto.getEventId())
                 .eq(RelayTeam::getSportItemId, dto.getSportItemId())
-                .eq(RelayTeam::getCollege, captain.getCollege())
-                .in(RelayTeam::getStatus, 1, 2));
+                .in(RelayTeam::getStatus, 1, 2);
+        boolean divisionB = "B".equalsIgnoreCase(item.getDivision());
+        if (divisionB && StringUtils.hasText(captain.getClassName())) {
+            collegeTeamQuery.eq(RelayTeam::getClassName, captain.getClassName());
+        } else {
+            collegeTeamQuery.eq(RelayTeam::getCollege, captain.getCollege());
+        }
+        long collegeTeams = this.count(collegeTeamQuery);
         if (collegeTeams >= maxPerCollege) {
-            throw new BusinessException("该项目每个学院最多可报名" + maxPerCollege + "支队伍");
+            throw new BusinessException("该项目每个" + (divisionB ? "年级/专业班级" : "学院")
+                    + "最多可报名" + maxPerCollege + "支队伍");
         }
 
         List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
