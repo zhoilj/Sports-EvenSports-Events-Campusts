@@ -37,6 +37,7 @@
         <el-table-column prop="studentNo" label="学号" width="120" />
         <el-table-column prop="college" label="学院" min-width="140" />
         <el-table-column prop="className" label="班级" min-width="120" />
+        <el-table-column label="参赛组别" width="165"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column prop="phone" label="联系电话" width="120" />
         <el-table-column prop="statusName" label="状态" width="100">
           <template #default="{ row }">
@@ -78,6 +79,7 @@
         <el-descriptions-item label="学号">{{ currentRow.studentNo }}</el-descriptions-item>
         <el-descriptions-item label="学院">{{ currentRow.college }}</el-descriptions-item>
         <el-descriptions-item label="班级">{{ currentRow.className }}</el-descriptions-item>
+        <el-descriptions-item label="参赛组别">{{ groupName(currentRow.competitionGroup) }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ currentRow.phone }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(currentRow.status)">{{ currentRow.statusName }}</el-tag>
@@ -170,6 +172,12 @@ function resetQuery() {
   queryParams.status = ''
   queryParams.current = 1
   loadData()
+}
+
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
 }
 
 function getStatusType(status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
