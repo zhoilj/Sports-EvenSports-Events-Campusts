@@ -111,6 +111,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/statistics/index.vue'),
         meta: { title: '统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'] }
       },
+      {
+        path: 'standings',
+        name: 'Standings',
+        component: () => import('@/views/statistics/standings.vue'),
+        meta: { title: '学院积分与奖牌榜', icon: 'Medal', roles: ['ADMIN', 'TEACHER'] }
+      },
       // 个人中心
       {
         path: 'profile',
