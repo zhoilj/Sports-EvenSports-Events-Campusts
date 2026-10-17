@@ -47,8 +47,10 @@ public class RelayTeamController {
     @GetMapping("/eligible-members")
     @PreAuthorize("hasRole('STUDENT')")
     public Result<List<RelayTeamMemberVO>> getEligibleMembers(
+            @RequestParam(required = false) Long sportItemId,
+            @RequestParam(required = false) Long teamId,
             @RequestParam(required = false) String keyword) {
-        return Result.success(relayTeamService.getEligibleMembers(keyword));
+        return Result.success(relayTeamService.getEligibleMembers(sportItemId, teamId, keyword));
     }
 
     @GetMapping("/{id}")
