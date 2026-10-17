@@ -158,8 +158,8 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
+function getStatusType(status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     PENDING: 'warning',
     APPROVED: 'success',
     REJECTED: 'danger',
