@@ -204,8 +204,8 @@ function resetQuery() {
   loadData()
 }
 
-function getRoleType(role: string) {
-  const map: Record<string, string> = {
+function getRoleType(role: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     ADMIN: 'danger',
     TEACHER: 'warning',
     STUDENT: 'primary'
