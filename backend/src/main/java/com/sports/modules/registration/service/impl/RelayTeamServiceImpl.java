@@ -294,6 +294,24 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
                     && !captainClass.equals(user.getClassName())) {
                 throw new BusinessException("乙组接力队员必须来自同一年级/专业班级，团体积分按班级归属统计");
             }
+            boolean mixedRelay = "MIXED".equalsIgnoreCase(item.getGenderCategory())
+                    || (item.getName() != null && item.getName().contains("混合接力"));
+            if (!mixedRelay && "MALE".equalsIgnoreCase(item.getGenderCategory())
+                    && !Objects.equals(user.getGender(), 1)) {
+                throw new BusinessException("男子接力项目的队员必须全部为男性");
+            }
+            if (!mixedRelay && "FEMALE".equalsIgnoreCase(item.getGenderCategory())
+                    && !Objects.equals(user.getGender(), 2)) {
+                throw new BusinessException("女子接力项目的队员必须全部为女性");
+            }
+            if (!mixedRelay && Integer.valueOf(1).equals(item.getGenderLimit())
+                    && !Objects.equals(user.getGender(), 1)) {
+                throw new BusinessException("该接力项目仅限男性参赛");
+            }
+            if (!mixedRelay && Integer.valueOf(2).equals(item.getGenderLimit())
+                    && !Objects.equals(user.getGender(), 2)) {
+                throw new BusinessException("该接力项目仅限女性参赛");
+            }
         }
     }
 
