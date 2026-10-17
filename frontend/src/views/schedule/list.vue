@@ -198,8 +198,8 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: number) {
-  const map: Record<number, string> = {
+function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     1: 'info',      // 未开始
     2: 'primary',   // 进行中
     3: 'success',   // 已结束
