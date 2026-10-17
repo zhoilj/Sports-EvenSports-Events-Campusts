@@ -27,6 +27,7 @@ import java.util.List;
 public class SportItemController {
 
     private final SportItemService sportItemService;
+    private final com.sports.modules.event.service.EventService eventService;
 
     @Operation(summary = "分页查询运动项目")
     @GetMapping
@@ -84,6 +85,45 @@ public class SportItemController {
         sportItem.setId(id);
         sportItemService.updateById(sportItem);
         return Result.success();
+    }
+
+    @Operation(summary = "按正式秩序册匹配项目默认规则")
+    @PostMapping("/event/{eventId}/apply-orderbook-defaults")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Integer> applyOrderBookDefaults(@PathVariable Long eventId) {
+        if (eventService.getById(eventId) == null) throw new BusinessException(ResultCode.EVENT_NOT_FOUND);
+        List<SportItem> items = sportItemService.getByEventId(eventId);
+        if (items == null || items.isEmpty()) throw new BusinessException("该赛事尚未创建比赛项目");
+        int updated = 0;
+        for (SportItem item : items) {
+            String name = item.getName() == null ? "" : item.getName().replaceAll("\\s", "");
+            boolean groupEvent = containsAny(name, "集体", "民体", "趣味", "拔河", "跳长绳", "两人三足",
+                    "三人板鞋", "抛绣球", "背篓接绣球", "校园越野跑", "车轮滚滚", "旱地龙舟",
+                    "袋鼠跳", "滚铁环", "企鹅漫步", "协同大转盘", "竞步跑");
+            boolean mixedRelay = name.contains("混合接力") || name.contains("混合");
+            item.setDivision(name.contains("甲组") ? "A" : name.contains("乙组") ? "B"
+                    : name.contains("教工组") ? "STAFF" : groupEvent ? "A" : "OPEN");
+            item.setGenderCategory(mixedRelay ? "MIXED" : name.contains("男子") ? "MALE"
+                    : name.contains("女子") ? "FEMALE" : Integer.valueOf(1).equals(item.getGenderLimit()) ? "MALE"
+                    : Integer.valueOf(2).equals(item.getGenderLimit()) ? "FEMALE" : "OPEN");
+            boolean prelimFinal = !mixedRelay && "TRACK".equalsIgnoreCase(item.getType())
+                    && (name.contains("100米") || name.contains("200米")
+                    || name.matches(".*4[×xX]100米接力.*"));
+            item.setRoundPolicy(prelimFinal ? "PRELIMINARY_FINAL" : "FINAL_ONLY");
+            item.setScoringMultiplier(Integer.valueOf(1).equals(item.getIsRelay()) || groupEvent ? 2 : 1);
+            item.setParticipationPoints(groupEvent ? 3 : 0);
+            item.setRecordPoints(9);
+            sportItemService.updateById(item);
+            updated++;
+        }
+        return Result.success("已匹配默认规则，请逐项对照秩序册复核", updated);
+    }
+
+    private boolean containsAny(String value, String... keywords) {
+        for (String keyword : keywords) {
+            if (value.contains(keyword)) return true;
+        }
+        return false;
     }
 
     @Operation(summary = "删除运动项目")
