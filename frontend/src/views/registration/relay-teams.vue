@@ -133,10 +133,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { get, post, put } from '@/utils/request'
 import { useUserStore } from '@/stores/user'
 
+const route = useRoute()
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.userInfo?.userId)
 const isStaff = computed(() => ['ADMIN', 'TEACHER'].includes(userStore.userInfo?.role || ''))
@@ -182,6 +184,17 @@ const memberSelectionLimit = computed(() => {
 onMounted(async () => {
   await loadEvents()
   await loadTeams()
+  if (!isStaff.value && route.query.eventId && route.query.sportItemId) {
+    await openCreate()
+    const eventId = Number(route.query.eventId)
+    const sportItemId = Number(route.query.sportItemId)
+    formData.eventId = eventId
+    await onEventChange(eventId)
+    if (relayItems.value.some(item => item.id === sportItemId)) {
+      formData.sportItemId = sportItemId
+      await loadEligibleMembers('', true)
+    }
+  }
 })
 
 async function loadEvents() {
