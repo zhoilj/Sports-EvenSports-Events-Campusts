@@ -156,6 +156,20 @@
           <el-form-item label="每学院队数" prop="maxTeamsPerCollege">
             <el-input-number v-model="formData.maxTeamsPerCollege" :min="1" :max="10" />
           </el-form-item>
+          <el-form-item label="队员构成规则" prop="teamRosterRule">
+            <el-select v-model="formData.teamRosterRule" placeholder="请选择队员构成规则" style="width: 260px">
+              <el-option label="不限制性别" value="ANY" />
+              <el-option label="全男" value="MALE_ONLY" />
+              <el-option label="全女" value="FEMALE_ONLY" />
+              <el-option label="5男5女" value="MIXED_5M5F" />
+              <el-option label="10男10女" value="MIXED_10M10F" />
+              <el-option label="15男15女" value="MIXED_15M15F" />
+              <el-option label="3男3女" value="MIXED_3M3F" />
+              <el-option label="6男4女" value="MIXED_6M4F" />
+              <el-option label="至少6名女生（仍需分组人工核验）" value="MIXED_MIN_6F" />
+              <el-option label="按专项规程人工核验" value="CUSTOM" />
+            </el-select>
+          </el-form-item>
         </template>
         <template v-if="formData.isRelay === 1">
           <el-form-item label="正式队员数" prop="relayMemberCount">
@@ -217,6 +231,7 @@ const formData = reactive({
   teamMemberCount: 0,
   teamReserveCount: 0,
   maxTeamsPerCollege: 1,
+  teamRosterRule: 'ANY',
   relayMemberCount: 4,
   relayReserveCount: 0,
   rules: ''
@@ -283,7 +298,7 @@ function handleAdd() {
     division: 'OPEN', genderCategory: 'OPEN', roundPolicy: 'FINAL_ONLY',
     scoringMultiplier: 1, participationPoints: 0, recordPoints: 9,
     genderLimit: 0, maxParticipants: 100, isRelay: 0,
-    isTeamEvent: 0, teamMemberCount: 0, teamReserveCount: 0, maxTeamsPerCollege: 1,
+    isTeamEvent: 0, teamMemberCount: 0, teamReserveCount: 0, maxTeamsPerCollege: 1, teamRosterRule: 'ANY',
     relayMemberCount: 4, relayReserveCount: 0, rules: ''
   })
   dialogVisible.value = true
