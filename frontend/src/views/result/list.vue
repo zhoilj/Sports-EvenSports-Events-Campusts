@@ -60,6 +60,7 @@
             <el-button v-if="row.isPublished !== 1" link type="warning" @click="reviewResult(row, 3)">退回修改</el-button>
             <el-button v-if="row.scheduleId && row.isPublished !== 1" link type="success" @click="publishSchedule(row)">发布本场</el-button>
             <el-button v-if="row.isPublished !== 1" link type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button link type="info" @click="viewAudit(row)">审计记录</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -133,6 +134,22 @@
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">保存为待复核</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="auditDialogVisible" title="成绩变更审计记录" width="900px">
+      <el-table :data="auditRows" border stripe>
+        <el-table-column prop="operatedAt" label="操作时间" width="170" />
+        <el-table-column prop="action" label="操作" width="110" />
+        <el-table-column prop="operatorId" label="操作人ID" width="100" />
+        <el-table-column prop="remark" label="说明" min-width="160" />
+        <el-table-column label="变更前" min-width="200">
+          <template #default="{ row }"><pre class="audit-json">{{ row.beforeValue || '—' }}</pre></template>
+        </el-table-column>
+        <el-table-column label="变更后" min-width="200">
+          <template #default="{ row }"><pre class="audit-json">{{ row.afterValue || '—' }}</pre></template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="auditRows.length === 0" description="暂无审计记录" />
+    </el-dialog>
   </div>
 </template>
 
@@ -156,6 +173,8 @@ const participantOptions = ref<any[]>([])
 const relayTeamOptions = ref<any[]>([])
 const queryParams = reactive({ current: 1, size: 10, eventId: null as number | null, sportItemId: null as number | null })
 const dialogVisible = ref(false)
+const auditDialogVisible = ref(false)
+const auditRows = ref<any[]>([])
 const dialogTitle = ref('')
 const formRef = ref<FormInstance>()
 const editingId = ref<number | null>(null)
@@ -414,6 +433,14 @@ async function publishSchedule(row: any) {
   await loadData()
 }
 
+async function viewAudit(row: any) {
+  const res = await get(`/results/${row.id}/audit`)
+  if (res.code === 200) {
+    auditRows.value = res.data || []
+    auditDialogVisible.value = true
+  }
+}
+
 async function handleDelete(row: any) {
   await ElMessageBox.confirm('确定删除该条未发布成绩？', '删除成绩', { type: 'warning' })
   await del(`/results/${row.id}`)
@@ -465,6 +492,14 @@ function reviewType(status: number): 'success' | 'warning' | 'info' | 'danger' {
 </script>
 
 <style scoped>
+.audit-json {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+  font-size: 11px;
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;
