@@ -53,6 +53,9 @@ public class UserVO {
      */
     private String className;
 
+    /** A=普通本科组，B=体育专业组。 */
+    private String competitionGroup;
+
     /**
      * 手机号
      */
