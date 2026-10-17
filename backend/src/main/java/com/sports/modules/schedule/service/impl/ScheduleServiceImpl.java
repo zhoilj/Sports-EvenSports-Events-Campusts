@@ -22,6 +22,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 赛程 Service 实现
@@ -113,9 +114,27 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
         if (roundType != null && !java.util.Set.of("PRELIMINARY", "SEMIFINAL", "FINAL", "FIELD_FINAL").contains(roundType)) {
             throw new BusinessException("比赛轮次类型无效");
         }
+        String roundPolicy = item.getRoundPolicy() == null ? "FLEXIBLE" : item.getRoundPolicy();
+        if ("FINAL_ONLY".equalsIgnoreCase(roundPolicy)
+                && !java.util.Set.of("FINAL", "FIELD_FINAL").contains(roundType)) {
+            throw new BusinessException("该项目按秩序册只进行决赛，不能创建预赛或半决赛");
+        }
+        if ("PRELIMINARY_FINAL".equalsIgnoreCase(roundPolicy)
+                && !java.util.Set.of("PRELIMINARY", "FINAL").contains(roundType)) {
+            throw new BusinessException("该项目按秩序册只允许预赛和决赛，不设置半决赛或田赛轮次");
+        }
+        if ("FIELD".equalsIgnoreCase(item.getType())
+                && java.util.Set.of("PRELIMINARY", "SEMIFINAL").contains(roundType)) {
+            throw new BusinessException("田赛项目按秩序册直接进行决赛");
+        }
+        if (schedule.getQualificationCount() != null && schedule.getQualificationCount() < 1) {
+            throw new BusinessException("晋级人数必须为正整数");
+        }
+        if (schedule.getAwardCount() != null && schedule.getAwardCount() < 1) {
+            throw new BusinessException("录取名次数量必须为正整数");
+        }
 
-        java.time.LocalTime proposedEnd = schedule.getEndTime() == null
-                ? schedule.getStartTime().plusHours(1) : schedule.getEndTime();
+        java.time.LocalTime proposedEnd = effectiveEnd(schedule, item);
         List<Schedule> sameDay = this.list(new LambdaQueryWrapper<Schedule>()
                 .eq(Schedule::getMatchDate, schedule.getMatchDate())
                 .ne(excludeId != null, Schedule::getId, excludeId)
@@ -125,16 +144,45 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
                     || !schedule.getLocation().trim().equalsIgnoreCase(existing.getLocation().trim())) {
                 continue;
             }
-            java.time.LocalTime existingEnd = existing.getEndTime() == null
-                    ? existing.getStartTime().plusHours(1) : existing.getEndTime();
+            SportItem existingItem = sportItemService.getById(existing.getSportItemId());
+            if (!sameCompetitionArea(item, existingItem)) continue;
+            java.time.LocalTime existingEnd = effectiveEnd(existing, existingItem);
             boolean overlaps = schedule.getStartTime().isBefore(existingEnd)
                     && existing.getStartTime().isBefore(proposedEnd);
             if (overlaps) {
-                throw new BusinessException("场地时间冲突：场地“" + schedule.getLocation() + "”在"
+                throw new BusinessException("场地/项目区时间冲突：场地“" + schedule.getLocation() + "”在"
                         + existing.getStartTime() + "—" + existingEnd + "已有赛程“"
                         + existing.getScheduleName() + "”（赛程ID " + existing.getId() + "）");
             }
         }
+    }
+
+    private java.time.LocalTime effectiveEnd(Schedule schedule, SportItem item) {
+        if (schedule.getEndTime() != null) return schedule.getEndTime();
+        int minutes = 30;
+        if (item != null && "TRACK".equalsIgnoreCase(item.getType())) minutes = 5;
+        else if (item != null && "FIELD".equalsIgnoreCase(item.getType())) minutes = 90;
+        return schedule.getStartTime().plusMinutes(minutes);
+    }
+
+    private boolean sameCompetitionArea(SportItem left, SportItem right) {
+        if (left == null || right == null) return true;
+        String leftType = left.getType() == null ? "OTHER" : left.getType().toUpperCase();
+        String rightType = right.getType() == null ? "OTHER" : right.getType().toUpperCase();
+        if (!leftType.equals(rightType)) return false;
+        if ("TRACK".equals(leftType)) return true;
+        if ("FIELD".equals(leftType)) {
+            return fieldAreaKey(left).equals(fieldAreaKey(right));
+        }
+        return Objects.equals(left.getId(), right.getId());
+    }
+
+    private String fieldAreaKey(SportItem item) {
+        String name = item.getName() == null ? "" : item.getName();
+        String project = name.replaceAll("甲组|乙组|教工组|男子|女子|混合|决赛|预赛|田赛|\\s", "");
+        String gender = item.getGenderCategory() == null ? "OPEN" : item.getGenderCategory();
+        String division = item.getDivision() == null ? "OPEN" : item.getDivision();
+        return project + "|" + division + "|" + gender;
     }
 
     @Override
