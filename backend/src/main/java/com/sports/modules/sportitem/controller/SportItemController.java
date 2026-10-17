@@ -63,6 +63,10 @@ public class SportItemController {
         // 设置默认值
         if (sportItem.getStatus() == null) sportItem.setStatus(1);
         if (sportItem.getCurrentParticipants() == null) sportItem.setCurrentParticipants(0);
+        if (sportItem.getIsTeamEvent() == null) sportItem.setIsTeamEvent(Integer.valueOf(1).equals(sportItem.getIsRelay()) ? 1 : 0);
+        if (sportItem.getTeamMemberCount() == null) sportItem.setTeamMemberCount(0);
+        if (sportItem.getTeamReserveCount() == null) sportItem.setTeamReserveCount(0);
+        if (sportItem.getMaxTeamsPerCollege() == null) sportItem.setMaxTeamsPerCollege(1);
         if (sportItem.getDivision() == null) sportItem.setDivision("OPEN");
         if (sportItem.getGenderCategory() == null) sportItem.setGenderCategory("OPEN");
         if (sportItem.getRoundPolicy() == null) sportItem.setRoundPolicy("FINAL_ONLY");
@@ -103,6 +107,17 @@ public class SportItemController {
             boolean mixedRelay = name.contains("混合接力") || name.contains("混合");
             item.setDivision(name.contains("甲组") ? "A" : name.contains("乙组") ? "B"
                     : name.contains("教工组") ? "STAFF" : groupEvent ? "A" : "OPEN");
+            boolean teamEvent = Integer.valueOf(1).equals(item.getIsRelay()) || groupEvent;
+            item.setIsTeamEvent(teamEvent ? 1 : 0);
+            if (teamEvent && !Integer.valueOf(1).equals(item.getIsRelay()) && item.getTeamMemberCount() == null) {
+                item.setTeamMemberCount(defaultTeamMemberCount(name));
+            }
+            if (teamEvent && !Integer.valueOf(1).equals(item.getIsRelay())
+                    && (item.getTeamMemberCount() == null || item.getTeamMemberCount() == 0)) {
+                item.setTeamMemberCount(defaultTeamMemberCount(name));
+            }
+            if (item.getTeamReserveCount() == null) item.setTeamReserveCount(0);
+            item.setMaxTeamsPerCollege(defaultMaxTeamsPerCollege(name));
             item.setGenderCategory(mixedRelay ? "MIXED" : name.contains("男子") ? "MALE"
                     : name.contains("女子") ? "FEMALE" : Integer.valueOf(1).equals(item.getGenderLimit()) ? "MALE"
                     : Integer.valueOf(2).equals(item.getGenderLimit()) ? "FEMALE" : "OPEN");
@@ -121,6 +136,29 @@ public class SportItemController {
             updated++;
         }
         return Result.success("已匹配默认规则，请逐项对照秩序册复核", updated);
+    }
+
+    private int defaultTeamMemberCount(String name) {
+        if (name.contains("校园越野跑")) return 10;
+        if (name.contains("和谐共进")) return 10;
+        if (name.contains("两人三足")) return 20;
+        if (name.contains("拔河")) return 20;
+        if (name.contains("集体跳长绳")) return 20;
+        if (name.contains("车轮滚滚")) return 10;
+        if (name.contains("旱地龙舟")) return 10;
+        if (name.contains("袋鼠跳")) return 20;
+        if (name.contains("滚铁环")) return 10;
+        if (name.contains("企鹅漫步")) return 10;
+        if (name.contains("协同大转盘")) return 30;
+        if (name.contains("三人板鞋")) return 18;
+        if (name.contains("高杆绣球") || name.contains("背篓接绣球") || name.contains("抛绣球")) return 6;
+        return 0;
+    }
+
+    private int defaultMaxTeamsPerCollege(String name) {
+        if (name.contains("三人板鞋") || name.contains("高杆绣球")
+                || name.contains("背篓接绣球") || name.contains("抛绣球")) return 2;
+        return 1;
     }
 
     private boolean containsAny(String value, String... keywords) {
