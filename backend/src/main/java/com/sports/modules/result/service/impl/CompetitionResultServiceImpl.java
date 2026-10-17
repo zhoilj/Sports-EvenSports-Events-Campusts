@@ -9,6 +9,8 @@ import com.sports.modules.event.entity.Event;
 import com.sports.modules.event.service.EventService;
 import com.sports.modules.registration.entity.Registration;
 import com.sports.modules.registration.entity.RelayTeam;
+import com.sports.modules.registration.entity.RelayTeamMember;
+import com.sports.modules.registration.mapper.RelayTeamMemberMapper;
 import com.sports.modules.registration.service.RegistrationService;
 import com.sports.modules.registration.service.RelayTeamService;
 import com.sports.modules.result.entity.CompetitionResult;
@@ -55,6 +57,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     private final SysUserService sysUserService;
     private final RegistrationService registrationService;
     private final RelayTeamService relayTeamService;
+    private final RelayTeamMemberMapper relayTeamMemberMapper;
     private final ScheduleService scheduleService;
     private final ScheduleEntryMapper scheduleEntryMapper;
     private final ScoringRuleMapper scoringRuleMapper;
@@ -94,10 +97,17 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
 
     @Override
     public List<CompetitionResult> getMyResults(Long userId) {
-        return this.list(new LambdaQueryWrapper<CompetitionResult>()
-                .eq(CompetitionResult::getUserId, userId)
+        List<Long> teamIds = relayTeamMemberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                        .eq(RelayTeamMember::getUserId, userId))
+                .stream().map(RelayTeamMember::getTeamId).distinct().collect(Collectors.toList());
+        LambdaQueryWrapper<CompetitionResult> wrapper = new LambdaQueryWrapper<CompetitionResult>()
                 .eq(CompetitionResult::getIsPublished, 1)
-                .orderByDesc(CompetitionResult::getPublishedAt));
+                .and(q -> {
+                    q.eq(CompetitionResult::getUserId, userId);
+                    if (!teamIds.isEmpty()) q.or().in(CompetitionResult::getRelayTeamId, teamIds);
+                })
+                .orderByDesc(CompetitionResult::getPublishedAt);
+        return this.list(wrapper);
     }
 
     @Override
