@@ -197,7 +197,8 @@ public class CompetitionReportController {
             }
             String college = team != null ? team.getCollege() : (user == null ? null : user.getCollege());
             String className = team != null ? team.getClassName() : (user == null ? null : user.getClassName());
-            String division = resolveDivision(item);
+            String division = team != null && Objects.equals(item.getIsTeamEvent(), 1)
+                    ? resolveTeamDivision(item, team) : resolveDivision(item);
             String gender = resolveGenderCategory(item);
             if ("A".equals(division)) {
                 if ("MALE".equals(gender)) {
@@ -306,6 +307,16 @@ public class CompetitionReportController {
         if (name.contains("教工组")) return "STAFF";
         if (name.contains("集体") || name.contains("民体") || name.contains("趣味")) return "A";
         return "OPEN";
+    }
+
+    private String resolveTeamDivision(SportItem item, RelayTeam team) {
+        String name = item.getName() == null ? "" : item.getName();
+        if (name.contains("教工组") || "STAFF".equalsIgnoreCase(item.getDivision())) return "STAFF";
+        String className = team.getClassName() == null ? "" : team.getClassName();
+        if (className.matches(".*(社体|体教|体育教育|社会体育|运动训练|休闲体育|体育保健).*")) return "B";
+        if ("B".equalsIgnoreCase(item.getDivision()) || name.contains("乙组")) return "B";
+        if ("A".equalsIgnoreCase(item.getDivision()) || name.contains("甲组")) return "A";
+        return "A";
     }
 
     private String resolveGenderCategory(SportItem item) {
