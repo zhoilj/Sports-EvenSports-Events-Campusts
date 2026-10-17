@@ -27,7 +27,7 @@
           </el-button>
           <el-button :disabled="!selectedScheduleId" :loading="conflictLoading" @click="checkConflicts">检查赛程冲突</el-button>
           <el-button :disabled="!selectedScheduleId" @click="loadEntries">刷新名单</el-button>
-          <el-button v-if="currentSchedule?.status === 3 && currentSchedule?.roundType !== 'FIELD_FINAL'" type="success" @click="openAdvanceDialog">
+          <el-button v-if="currentSchedule?.status === 3 && ['PRELIMINARY', 'SEMIFINAL'].includes(currentSchedule?.roundType || '')" type="success" @click="openAdvanceDialog">
             晋级下一轮
           </el-button>
         </el-form-item>
@@ -84,8 +84,8 @@
         <el-table-column prop="checkinRemark" label="检录备注" min-width="140" show-overflow-tooltip />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button v-if="currentSchedule?.status === 1 || currentSchedule?.status === 2" type="success" link @click="updateCheckin(row, 'CHECKED_IN')">已检录</el-button>
-            <el-dropdown v-if="currentSchedule?.status === 1 || currentSchedule?.status === 2" @command="status => updateCheckin(row, String(status))">
+            <el-button v-if="canUpdateCheckin(row)" type="success" link @click="updateCheckin(row, 'CHECKED_IN')">已检录</el-button>
+            <el-dropdown v-if="canUpdateCheckin(row)" @command="status => updateCheckin(row, String(status))">
               <el-button type="primary" link>未到场/其他<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -307,6 +307,12 @@ async function submitAdvance() {
   } finally {
     advanceLoading.value = false
   }
+}
+
+function canUpdateCheckin(row: any) {
+  const scheduleStatus = currentSchedule.value?.status
+  return (scheduleStatus === 1 || scheduleStatus === 2)
+    && !['ABSENT', 'WITHDRAWN', 'DQ'].includes(row.checkinStatus)
 }
 
 function getScheduleStatusName(status: number) {
