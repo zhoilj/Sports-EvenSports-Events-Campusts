@@ -40,6 +40,11 @@ public interface CompetitionResultService extends IService<CompetitionResult> {
     List<CompetitionResultVO> getMyResultsVO(Long userId);
 
     /**
+     * 校验报名资格后新增或更新成绩，并重新计算当前场次名次。
+     */
+    void saveValidatedResult(CompetitionResult result);
+
+    /**
      * 批量录入成绩
      */
     void batchSaveResults(List<CompetitionResult> results);
