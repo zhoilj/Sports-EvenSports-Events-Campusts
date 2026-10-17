@@ -30,6 +30,7 @@
         <el-table-column prop="teamName" label="队伍名称" min-width="150" />
         <el-table-column prop="eventName" label="赛事" min-width="160" />
         <el-table-column prop="sportItemName" label="接力项目" min-width="130" />
+        <el-table-column label="竞赛组别" width="165"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column prop="college" label="学院" min-width="140" />
         <el-table-column prop="creatorName" label="队长" width="100" />
         <el-table-column label="队员名单" min-width="250">
@@ -348,6 +349,12 @@ async function viewTeam(row: any) {
 
 function formatMembers(members: any[] = []) {
   return members.map(member => `${member.realName || member.username}${member.reserve ? '（替补）' : `（第${member.legOrder}棒）`}`).join('、')
+}
+
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
 }
 
 function statusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
