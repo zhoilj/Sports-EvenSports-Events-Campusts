@@ -75,6 +75,7 @@ public class FieldAttemptServiceImpl extends ServiceImpl<FieldAttemptMapper, Fie
             }
             Schedule schedule = scheduleService.getById(entry.getScheduleId());
             validateFieldSchedule(schedule);
+            if (schedule.getStatus() != 2) throw new BusinessException("只有进行中的田赛赛程可以录入试跳/试投成绩");
             CheckinRecord checkin = checkinRecordMapper.selectOne(new LambdaQueryWrapper<CheckinRecord>()
                     .eq(CheckinRecord::getScheduleEntryId, entry.getId()));
             if (checkin == null || !"CHECKED_IN".equals(checkin.getStatus())) {
@@ -157,9 +158,6 @@ public class FieldAttemptServiceImpl extends ServiceImpl<FieldAttemptMapper, Fie
                 result.setScoreText("无有效试跳/试投");
                 result.setRemark("所有已登记试跳/试投均无效");
             } else {
-                Comparator<FieldAttempt> comparator = Comparator.comparing(FieldAttempt::getScore);
-                if (ascending) comparator = comparator.reversed();
-                FieldAttempt best = valid.stream().max(Comparator.comparing(FieldAttempt::getScore)).orElseThrow();
                 BigDecimal bestScore = valid.stream().map(FieldAttempt::getScore)
                         .reduce((left, right) -> ascending
                                 ? (left.compareTo(right) <= 0 ? left : right)
