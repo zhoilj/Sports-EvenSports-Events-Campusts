@@ -55,8 +55,8 @@
             <el-button 
               type="primary" 
               link 
-              @click="handleRegisterItem(row)"
-              :disabled="isItemFull(row) || row.isRelay === 1"
+              @click="handleItemAction(row)"
+              :disabled="row.isRelay !== 1 && isItemFull(row)"
             >
               {{ row.isRelay === 1 ? '接力组队报名' : isItemFull(row) ? '已满' : '报名' }}
             </el-button>
@@ -229,6 +229,17 @@ function handleRegisterItem(item: any) {
   registerForm.sportItemId = item.id
   registerForm.remark = ''
   registerDialogVisible.value = true
+}
+
+function handleItemAction(item: any) {
+  if (item.isRelay === 1) {
+    router.push({
+      path: '/relay-teams',
+      query: { eventId: String(eventData.value.id), sportItemId: String(item.id) }
+    })
+    return
+  }
+  if (!isItemFull(item)) handleRegisterItem(item)
 }
 
 async function submitRegister() {
