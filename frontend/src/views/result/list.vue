@@ -366,6 +366,7 @@ async function loadParticipants() {
 function onResultStatusChange(status: string) {
   if (status !== 'VALID') {
     formData.score = null
+    formData.isRecord = 0
     formData.scoreText = status
   } else if (formData.scoreText === 'DNS' || formData.scoreText === 'DNF' || formData.scoreText === 'DQ' || formData.scoreText === 'WD') {
     formData.scoreText = ''
