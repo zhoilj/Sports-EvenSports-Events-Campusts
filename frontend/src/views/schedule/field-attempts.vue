@@ -86,7 +86,7 @@
         </el-table-column>
         <el-table-column label="犯规/无效" width="120">
           <template #default="{ row }">
-            <el-checkbox v-model="row.foul" @change="value => { if (value) row.score = null }">犯规</el-checkbox>
+            <el-checkbox v-model="row.foul" @change="handleFoulChange(row)">犯规</el-checkbox>
           </template>
         </el-table-column>
         <el-table-column label="备注" min-width="200">
@@ -215,6 +215,10 @@ function openAttempts(row: any) {
     }
   })
   attemptDialogVisible.value = true
+}
+
+function handleFoulChange(row: AttemptEdit) {
+  if (row.foul) row.score = null
 }
 
 async function saveAttempts() {
