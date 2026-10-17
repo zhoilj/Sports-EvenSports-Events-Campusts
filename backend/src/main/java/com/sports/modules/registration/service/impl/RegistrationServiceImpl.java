@@ -82,7 +82,11 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "该项目为接力项目，请通过接力组队报名");
         }
 
-        SysUser user = sysUserService.getById(userId);
+        // Lock the student's row as well, serializing concurrent submissions across different projects
+        // so the per-event project limit cannot be exceeded by parallel requests.
+        SysUser user = sysUserService.getOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getId, userId)
+                .last("FOR UPDATE"));
         if (user == null || user.getStatus() == null || user.getStatus() != 1
                 || !"STUDENT".equals(user.getRole())) {
             throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "仅状态正常的学生账号可以报名");
