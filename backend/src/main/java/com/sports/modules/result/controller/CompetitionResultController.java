@@ -56,7 +56,7 @@ public class CompetitionResultController {
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> saveResult(@Valid @RequestBody CompetitionResult result) {
-        competitionResultService.save(result);
+        competitionResultService.saveValidatedResult(result);
         return Result.success();
     }
 
@@ -73,7 +73,7 @@ public class CompetitionResultController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
     public Result<Void> updateResult(@PathVariable Long id, @Valid @RequestBody CompetitionResult result) {
         result.setId(id);
-        competitionResultService.updateById(result);
+        competitionResultService.saveValidatedResult(result);
         return Result.success();
     }
 
