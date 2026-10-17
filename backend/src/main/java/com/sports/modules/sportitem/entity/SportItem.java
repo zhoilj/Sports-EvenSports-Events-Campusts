@@ -45,6 +45,24 @@ public class SportItem extends BaseEntity {
     private String type;
 
     /**
+     * 是否为接力项目（0-个人项目 1-接力项目）。
+     */
+    @TableField("is_relay")
+    private Integer isRelay;
+
+    /**
+     * 接力队伍必须登记的正式队员人数。
+     */
+    @TableField("relay_member_count")
+    private Integer relayMemberCount;
+
+    /**
+     * 接力队伍允许登记的替补人数。
+     */
+    @TableField("relay_reserve_count")
+    private Integer relayReserveCount;
+
+    /**
      * 性别限制（0-不限 1-仅男 2-仅女）
      */
     @TableField("gender_limit")
