@@ -21,5 +21,5 @@ public interface SportItemService extends IService<SportItem> {
     /**
      * 分页查询项目
      */
-    IPage<SportItem> pageItems(Integer current, Integer size, Long eventId, String type, Integer status);
+    IPage<SportItem> pageItems(Integer current, Integer size, Long eventId, String name, String type, Integer status, String competitionGroup);
 }

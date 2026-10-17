@@ -90,6 +90,7 @@
         <el-table-column prop="startTime" label="开始时间" width="100" />
         <el-table-column prop="endTime" label="结束时间" width="100" />
         <el-table-column prop="sportItemName" label="比赛项目" min-width="150" />
+        <el-table-column label="竞赛组别" width="165"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column prop="scheduleName" label="赛程名称" min-width="120" />
         <el-table-column label="轮次" width="100">
           <template #default="{ row }">{{ roundName(row.roundType) }}</template>
@@ -193,6 +194,12 @@ async function exportOrderBook() {
 function printPreview() {
   window.print()
 }
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
+}
+
 function roundName(type: string) {
   const map: Record<string, string> = { PRELIMINARY: '预赛', SEMIFINAL: '半决赛', FINAL: '决赛', FIELD_FINAL: '田赛决赛' }
   return map[type] || type || '未设置'

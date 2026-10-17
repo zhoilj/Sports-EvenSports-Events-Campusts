@@ -67,6 +67,10 @@ public class SysUser extends BaseEntity {
     @TableField("class_name")
     private String className;
 
+    /** A=普通本科组，B=体育专业组；由管理员按学籍资料维护。 */
+    @TableField("competition_group")
+    private String competitionGroup;
+
     /**
      * 手机号
      */

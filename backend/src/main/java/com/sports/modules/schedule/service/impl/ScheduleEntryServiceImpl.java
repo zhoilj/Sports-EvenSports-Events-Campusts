@@ -101,6 +101,10 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
         }
 
+        if (!isValidCompetitionGroup(item.getCompetitionGroup())) {
+            throw new BusinessException("该项目尚未设置甲组/乙组，不能生成参赛名单");
+        }
+
         List<ScheduleEntry> candidates = new ArrayList<>();
         if (relay) {
             List<RelayTeam> teams = relayTeamService.list(new LambdaQueryWrapper<RelayTeam>()
@@ -109,6 +113,15 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
                     .eq(RelayTeam::getStatus, 2)
                     .orderByAsc(RelayTeam::getId));
             for (RelayTeam team : teams) {
+                String teamGroup = team.getCompetitionGroup();
+                if (!isValidCompetitionGroup(teamGroup)) {
+                    teamGroup = inferRelayTeamGroup(team);
+                    if (isValidCompetitionGroup(teamGroup)) {
+                        team.setCompetitionGroup(teamGroup);
+                        relayTeamService.updateById(team);
+                    }
+                }
+                if (!item.getCompetitionGroup().equals(teamGroup)) continue;
                 ScheduleEntry entry = new ScheduleEntry();
                 entry.setScheduleId(scheduleId);
                 entry.setRelayTeamId(team.getId());
@@ -122,6 +135,17 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
                     .eq(Registration::getStatus, 2)
                     .orderByAsc(Registration::getId));
             for (Registration registration : registrations) {
+                String registrationGroup = registration.getCompetitionGroup();
+                if (!isValidCompetitionGroup(registrationGroup)) {
+                    SysUser registeredUser = sysUserService.getById(registration.getUserId());
+                    if (registeredUser != null && isValidCompetitionGroup(registeredUser.getCompetitionGroup())
+                            && item.getCompetitionGroup().equals(registeredUser.getCompetitionGroup())) {
+                        registrationGroup = registeredUser.getCompetitionGroup();
+                        registration.setCompetitionGroup(registrationGroup);
+                        registrationService.updateById(registration);
+                    }
+                }
+                if (!item.getCompetitionGroup().equals(registrationGroup)) continue;
                 ScheduleEntry entry = new ScheduleEntry();
                 entry.setScheduleId(scheduleId);
                 entry.setRegistrationId(registration.getId());
@@ -130,14 +154,16 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
         }
         if (candidates.isEmpty()) {
-            throw new BusinessException(relay ? "该项目没有已通过审核的接力队伍" : "该项目没有已通过审核的报名记录");
+            throw new BusinessException(relay
+                    ? "该项目没有已通过审核且组别匹配的接力队伍"
+                    : "该项目没有已通过审核且组别匹配的报名记录");
         }
 
         int perGroup = field ? candidates.size() : Math.min(groupSize, laneCount);
         for (int i = 0; i < candidates.size(); i++) {
             ScheduleEntry entry = candidates.get(i);
             entry.setStartOrder(i + 1);
-            entry.setGroupNo(field ? "A" : groupLabel(i / perGroup));
+            entry.setGroupNo(field ? "田赛顺序" : groupLabel(i / perGroup));
             entry.setLaneNo(field ? null : (i % perGroup) + 1);
         }
         List<ScheduleConflictVO> conflicts = findConflicts(schedule, candidates);
@@ -183,6 +209,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             vo.setCheckinCode(buildCheckinCode(entry.getId()));
             vo.setEventName(event == null ? null : event.getName());
             vo.setSportItemName(scheduleItem == null ? null : scheduleItem.getName());
+            vo.setCompetitionGroup(scheduleItem == null ? null : scheduleItem.getCompetitionGroup());
             vo.setScheduleName(schedule.getScheduleName());
             vo.setMatchDate(schedule.getMatchDate());
             vo.setStartTime(schedule.getStartTime());
@@ -509,6 +536,24 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
 
     private String entryKey(ScheduleEntry entry) {
         return entry.getRelayTeamId() != null ? "T:" + entry.getRelayTeamId() : "R:" + entry.getRegistrationId();
+    }
+
+    private boolean isValidCompetitionGroup(String group) {
+        return "A".equals(group) || "B".equals(group);
+    }
+
+    private String inferRelayTeamGroup(RelayTeam team) {
+        List<RelayTeamMember> members = relayTeamMemberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                .eq(RelayTeamMember::getTeamId, team.getId()));
+        if (members.isEmpty()) return null;
+        String group = null;
+        for (RelayTeamMember member : members) {
+            SysUser user = sysUserService.getById(member.getUserId());
+            if (user == null || !isValidCompetitionGroup(user.getCompetitionGroup())) return null;
+            if (group == null) group = user.getCompetitionGroup();
+            else if (!group.equals(user.getCompetitionGroup())) return null;
+        }
+        return group;
     }
 
     private String groupLabel(int index) {

@@ -41,8 +41,8 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     private static final Integer STATUS_COMPLETED = 3;
 
     @Override
-    public IPage<ScheduleVO> pageSchedulesVO(Integer current, Integer size, Long eventId, String matchDate) {
-        IPage<Schedule> schedulePage = pageSchedules(current, size, eventId, matchDate);
+    public IPage<ScheduleVO> pageSchedulesVO(Integer current, Integer size, Long eventId, String matchDate, Long sportItemId) {
+        IPage<Schedule> schedulePage = pageSchedules(current, size, eventId, matchDate, sportItemId);
 
         return schedulePage.convert(this::convertToVO);
     }
@@ -64,6 +64,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
             SportItem sportItem = sportItemService.getById(schedule.getSportItemId());
             if (sportItem != null) {
                 vo.setSportItemName(sportItem.getName());
+                vo.setCompetitionGroup(sportItem.getCompetitionGroup());
             }
         }
 
@@ -71,11 +72,12 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     }
 
     @Override
-    public IPage<Schedule> pageSchedules(Integer current, Integer size, Long eventId, String matchDate) {
+    public IPage<Schedule> pageSchedules(Integer current, Integer size, Long eventId, String matchDate, Long sportItemId) {
         Page<Schedule> page = new Page<>(current, size);
 
         LambdaQueryWrapper<Schedule> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, Schedule::getEventId, eventId)
+                .eq(sportItemId != null, Schedule::getSportItemId, sportItemId)
                 .eq(StringUtils.hasText(matchDate), Schedule::getMatchDate, matchDate != null ? LocalDate.parse(matchDate) : null)
                 .orderByAsc(Schedule::getMatchDate)
                 .orderByAsc(Schedule::getStartTime);

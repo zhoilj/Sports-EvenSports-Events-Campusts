@@ -47,6 +47,14 @@
         </el-table-column>
         <el-table-column prop="studentNo" label="学号" width="120" />
         <el-table-column prop="college" label="学院" width="150" />
+        <el-table-column label="参赛组别" width="165">
+          <template #default="{ row }">
+            <el-tag v-if="row.role === 'STUDENT'" :type="row.competitionGroup === 'B' ? 'primary' : row.competitionGroup === 'A' ? 'success' : 'warning'">
+              {{ groupName(row.competitionGroup) }}
+            </el-tag>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="phone" label="电话" width="120" />
         <el-table-column prop="email" label="邮箱" min-width="150" />
         <el-table-column prop="status" label="状态" width="80">
@@ -113,6 +121,13 @@
         <el-form-item label="班级" prop="className">
           <el-input v-model="formData.className" placeholder="请输入班级" />
         </el-form-item>
+        <el-form-item label="参赛组别" prop="competitionGroup" v-if="formData.role === 'STUDENT'">
+          <el-select v-model="formData.competitionGroup" clearable placeholder="按学籍核定，未核定可留空">
+            <el-option label="甲组 · 普通本科组" value="A" />
+            <el-option label="乙组 · 体育专业组" value="B" />
+          </el-select>
+          <div class="form-tip">此项由管理员维护；未核定的学生不能报名，乙组仅限体育专业学生。</div>
+        </el-form-item>
         <el-form-item label="电话" prop="phone">
           <el-input v-model="formData.phone" placeholder="请输入电话" />
         </el-form-item>
@@ -166,6 +181,7 @@ const formData = reactive({
   studentNo: '',
   college: '',
   className: '',
+  competitionGroup: '',
   phone: '',
   email: '',
   gender: 'M'
@@ -204,6 +220,12 @@ function resetQuery() {
   loadData()
 }
 
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
+}
+
 function getRoleType(role: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
   const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     ADMIN: 'danger',
@@ -218,7 +240,7 @@ function handleAdd() {
   dialogTitle.value = '新增用户'
   Object.assign(formData, {
     username: '', password: '', realName: '', role: 'STUDENT',
-    studentNo: '', college: '', className: '', phone: '', email: '', gender: 'M'
+    studentNo: '', college: '', className: '', competitionGroup: '', phone: '', email: '', gender: 'M'
   })
   dialogVisible.value = true
 }
@@ -266,3 +288,8 @@ async function handleToggleStatus(row: any) {
   loadData()
 }
 </script>
+
+<style scoped>
+.form-tip { margin-top: 5px; color: #89968f; font-size: 11px; line-height: 1.6; }
+.muted { color: #9aa69f; }
+</style>

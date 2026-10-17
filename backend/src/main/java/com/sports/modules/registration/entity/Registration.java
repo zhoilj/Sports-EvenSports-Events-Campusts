@@ -47,6 +47,10 @@ public class Registration extends BaseEntity {
     @TableField("user_id")
     private Long userId;
 
+    /** 报名时锁定的竞赛组别快照：A=普通本科组，B=体育专业组。 */
+    @TableField("competition_group")
+    private String competitionGroup;
+
     /**
      * 状态（1-待审核 2-已通过 3-已拒绝 4-已取消）
      */

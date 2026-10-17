@@ -59,6 +59,10 @@ public class UserDTO {
     @Size(max = 50, message = "班级名称最多50个字符")
     private String className;
 
+    /** A=普通本科组，B=体育专业组；学生账号由管理员核定。 */
+    @Pattern(regexp = "^(A|B)?$", message = "参赛组别只能是A或B")
+    private String competitionGroup;
+
     /**
      * 手机号
      */

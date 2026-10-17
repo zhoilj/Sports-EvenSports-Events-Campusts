@@ -22,7 +22,7 @@
             <el-option
               v-for="schedule in scheduleOptions"
               :key="schedule.id"
-              :label="`${schedule.matchDate} ${schedule.startTime} · ${schedule.sportItemName} · ${schedule.scheduleName || '赛程'}`"
+              :label="`${schedule.matchDate} ${schedule.startTime} · ${schedule.sportItemName} · ${groupShort(schedule.competitionGroup)} · ${schedule.scheduleName || '赛程'}`"
               :value="schedule.id"
             />
           </el-select>
@@ -35,7 +35,7 @@
 
       <el-alert v-if="currentSchedule" type="info" :closable="false" show-icon class="mb-16">
         <template #title>
-          {{ currentSchedule.sportItemName }} · {{ roundName(currentSchedule.roundType) }} ·
+          {{ currentSchedule.sportItemName }} · {{ groupName(currentSchedule.competitionGroup) }} · {{ roundName(currentSchedule.roundType) }} ·
           {{ currentSchedule.matchDate }} {{ currentSchedule.startTime }}–{{ currentSchedule.endTime || '约60分钟' }} ·
           {{ currentSchedule.location || '未设置场地' }}
         </template>
@@ -55,6 +55,7 @@
       </div>
 
       <el-table :data="entryRows" v-loading="loading" border stripe>
+        <el-table-column label="竞赛组别" width="155"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column label="组别" prop="groupNo" width="75" />
         <el-table-column label="道次/顺序" width="95">
           <template #default="{ row }">{{ row.laneNo ?? row.startOrder ?? '—' }}</template>
@@ -107,14 +108,14 @@
 
     <el-dialog v-model="generateDialogVisible" title="生成分组分道名单" width="460px">
       <el-form label-width="130px">
-        <el-form-item label="每组人数">
+        <el-form-item v-if="!isField" label="每组人数">
           <el-input-number v-model="generateForm.groupSize" :min="1" :max="16" />
         </el-form-item>
-        <el-form-item label="可用道数">
+        <el-form-item v-if="!isField" label="可用道数">
           <el-input-number v-model="generateForm.laneCount" :min="1" :max="16" />
         </el-form-item>
         <el-alert type="info" :closable="false" show-icon>
-          径赛按组别和道次顺序编排；田赛按检录顺序生成参赛顺序。生成前会检查参赛者在同日其他赛程中的时间冲突。
+          {{ isField ? '田赛按已审核名单生成试跳/试投顺序，不分道；成绩通过试跳试投记录录入。' : '径赛按组别和道次自动分组分道。生成前会检查参赛者在同日其他赛程中的时间冲突。' }}
         </el-alert>
       </el-form>
       <template #footer>
@@ -425,6 +426,18 @@ function downloadCsv(content: string, filename: string) {
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+}
+
+function groupShort(group: string) {
+  if (group === 'A') return '甲组'
+  if (group === 'B') return '乙组'
+  return '未分组'
+}
+
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
 }
 
 function roundName(type: string) {

@@ -15,12 +15,12 @@ public interface ScheduleService extends IService<Schedule> {
     /**
      * 分页查询赛程（带关联信息）
      */
-    IPage<ScheduleVO> pageSchedulesVO(Integer current, Integer size, Long eventId, String matchDate);
+    IPage<ScheduleVO> pageSchedulesVO(Integer current, Integer size, Long eventId, String matchDate, Long sportItemId);
 
     /**
      * 分页查询赛程
      */
-    IPage<Schedule> pageSchedules(Integer current, Integer size, Long eventId, String matchDate);
+    IPage<Schedule> pageSchedules(Integer current, Integer size, Long eventId, String matchDate, Long sportItemId);
 
     /**
      * Validate schedule dates, item ownership, and venue-time overlaps before persistence.

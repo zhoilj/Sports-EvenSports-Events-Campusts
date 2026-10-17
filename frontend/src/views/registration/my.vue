@@ -25,6 +25,7 @@
       <el-table :data="tableData" v-loading="loading" border stripe>
         <el-table-column prop="eventName" label="赛事名称" min-width="150" />
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
+        <el-table-column label="参赛组别" width="165"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column prop="statusName" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">{{ row.statusName }}</el-tag>
@@ -100,6 +101,12 @@ function resetQuery() {
   queryParams.status = ''
   queryParams.current = 1
   loadData()
+}
+
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
 }
 
 function getStatusType(status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
