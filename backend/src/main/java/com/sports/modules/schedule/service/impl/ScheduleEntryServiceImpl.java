@@ -175,7 +175,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             vo.setLaneNo(entry.getLaneNo());
             vo.setStartOrder(entry.getStartOrder());
             vo.setQualificationStatus(entry.getQualificationStatus());
-            vo.setCheckinCode("CK" + String.format(java.util.Locale.ROOT, "%08d", entry.getId()));
+            vo.setCheckinCode(buildCheckinCode(entry.getId()));
             vo.setEventName(event == null ? null : event.getName());
             vo.setSportItemName(scheduleItem == null ? null : scheduleItem.getName());
             vo.setScheduleName(schedule.getScheduleName());
@@ -519,5 +519,12 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
 
     private String timeRange(Schedule schedule) {
         return schedule.getStartTime() + "—" + effectiveEnd(schedule);
+    }
+
+    static String buildCheckinCode(Long entryId) {
+        if (entryId == null || entryId < 1) {
+            throw new IllegalArgumentException("参赛编排记录ID必须为正整数");
+        }
+        return "CK" + String.format(java.util.Locale.ROOT, "%08d", entryId);
     }
 }
