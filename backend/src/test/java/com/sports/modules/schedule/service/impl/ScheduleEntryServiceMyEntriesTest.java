@@ -3,7 +3,6 @@ package com.sports.modules.schedule.service.impl;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
-import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.sports.modules.event.entity.Event;
 import com.sports.modules.event.service.EventService;
@@ -43,6 +42,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -102,11 +102,11 @@ class ScheduleEntryServiceMyEntriesTest {
         );
         ReflectionTestUtils.setField(service, "baseMapper", scheduleEntryMapper);
 
-        when(scheduleService.getById(SCHEDULE_ID)).thenReturn(schedule());
-        when(eventService.getById(EVENT_ID)).thenReturn(event());
-        when(sportItemService.getById(SPORT_ITEM_ID)).thenReturn(sportItem());
-        when(competitionResultService.list(anyWrapper())).thenReturn(List.of());
-        when(checkinRecordMapper.selectOne(anyWrapper())).thenReturn(null);
+        lenient().when(scheduleService.getById(SCHEDULE_ID)).thenReturn(schedule());
+        lenient().when(eventService.getById(EVENT_ID)).thenReturn(event());
+        lenient().when(sportItemService.getById(SPORT_ITEM_ID)).thenReturn(sportItem());
+        lenient().when(competitionResultService.list(anyWrapper())).thenReturn(List.of());
+        lenient().when(checkinRecordMapper.selectOne(anyWrapper())).thenReturn(null);
     }
 
     @Test
