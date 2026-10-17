@@ -15,6 +15,7 @@
         <el-descriptions-item label="结束日期">{{ eventData.endDate }}</el-descriptions-item>
         <el-descriptions-item label="报名开始">{{ eventData.regStartDate }}</el-descriptions-item>
         <el-descriptions-item label="报名截止">{{ eventData.regEndDate }}</el-descriptions-item>
+        <el-descriptions-item label="每人限报">{{ eventData.maxItemsPerUser > 0 ? eventData.maxItemsPerUser + ' 个个人项目' : '不限' }}</el-descriptions-item>
         <el-descriptions-item label="举办地点">{{ eventData.location }}</el-descriptions-item>
         <el-descriptions-item label="主办单位">{{ eventData.organizer }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ eventData.contactPhone }}</el-descriptions-item>
@@ -37,10 +38,17 @@
       </template>
       <el-table :data="sportItems" border stripe>
         <el-table-column prop="name" label="项目名称" />
-        <el-table-column prop="categoryName" label="类别" width="100" />
-        <el-table-column prop="genderName" label="性别要求" width="100" />
-        <el-table-column prop="maxParticipants" label="人数上限" width="100" />
-        <el-table-column prop="currentParticipants" label="已报名" width="100" />
+        <el-table-column prop="type" label="类别" width="100" />
+        <el-table-column prop="genderLimit" label="性别限制" width="100">
+          <template #default="{ row }">{{ row.genderLimit === 1 ? '仅男' : row.genderLimit === 2 ? '仅女' : '不限' }}</template>
+        </el-table-column>
+        <el-table-column prop="maxParticipants" label="人数上限" width="100">
+          <template #default="{ row }">{{ row.maxParticipants > 0 ? row.maxParticipants : '不限' }}</template>
+        </el-table-column>
+        <el-table-column prop="currentParticipants" label="有效报名" width="100" />
+        <el-table-column prop="isRelay" label="项目形式" width="100">
+          <template #default="{ row }">{{ row.isRelay === 1 ? '接力项目' : '个人项目' }}</template>
+        </el-table-column>
         <el-table-column prop="rules" label="比赛规则" />
         <el-table-column label="操作" width="120" v-if="canRegister">
           <template #default="{ row }">
@@ -48,9 +56,9 @@
               type="primary" 
               link 
               @click="handleRegisterItem(row)"
-              :disabled="row.currentParticipants >= row.maxParticipants"
+              :disabled="isItemFull(row) || row.isRelay === 1"
             >
-              {{ row.currentParticipants >= row.maxParticipants ? '已满' : '报名' }}
+              {{ row.isRelay === 1 ? '接力组队报名' : isItemFull(row) ? '已满' : '报名' }}
             </el-button>
           </template>
         </el-table-column>
@@ -90,7 +98,7 @@
               :key="item.id" 
               :label="item.name" 
               :value="item.id"
-              :disabled="item.currentParticipants >= item.maxParticipants"
+              :disabled="item.isRelay === 1 || isItemFull(item)"
             />
           </el-select>
         </el-form-item>
@@ -135,14 +143,27 @@ const registerRules: FormRules = {
 }
 
 const canRegister = computed(() => {
-  return userStore.userInfo?.role === 'STUDENT' && 
-         eventData.value.status === 'PUBLISHED' &&
-         new Date() <= new Date(eventData.value.regEndDate)
+  if (userStore.userInfo?.role !== 'STUDENT' || Number(eventData.value.status) !== 2) return false
+  const today = new Date()
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  const start = eventData.value.regStartDate
+    ? new Date(`${eventData.value.regStartDate}T00:00:00`).getTime()
+    : null
+  const end = eventData.value.regEndDate
+    ? new Date(`${eventData.value.regEndDate}T23:59:59`).getTime()
+    : null
+  return (start === null || todayStart >= start) && (end === null || today.getTime() <= end)
 })
 
 const availableItems = computed(() => {
-  return sportItems.value.filter(item => item.currentParticipants < item.maxParticipants)
+  return sportItems.value.filter(item => item.isRelay !== 1 && !isItemFull(item) && item.status === 1)
 })
+
+function isItemFull(item: any) {
+  const max = Number(item.maxParticipants || 0)
+  const current = Number(item.currentParticipants || 0)
+  return max > 0 && current >= max
+}
 
 onMounted(() => {
   loadEventDetail()
@@ -178,23 +199,22 @@ function goBack() {
   router.push('/events')
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    DRAFT: 'info',
-    PUBLISHED: 'primary',
-    ONGOING: 'success',
-    ENDED: 'warning',
-    CANCELLED: 'danger'
+function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
+    1: 'info',
+    2: 'primary',
+    3: 'success',
+    4: 'warning'
   }
   return map[status] || 'info'
 }
 
-function getScheduleStatusType(status: string) {
-  const map: Record<string, string> = {
-    PENDING: 'info',
-    ONGOING: 'primary',
-    COMPLETED: 'success',
-    CANCELLED: 'danger'
+function getScheduleStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
+    1: 'info',
+    2: 'primary',
+    3: 'success',
+    4: 'danger'
   }
   return map[status] || 'info'
 }
