@@ -24,6 +24,7 @@ public class RegistrationVO {
     private String studentNo;
     private String college;
     private String className;
+    private String competitionGroup;
     private String phone;
     private String status;
     private String statusName;
