@@ -10,7 +10,7 @@ public class AdvanceEntriesDTO {
     private Long sourceScheduleId;
     @NotNull
     private Long targetScheduleId;
-    @NotNull @Min(1)
+    @Min(1)
     private Integer qualifyCount;
     @Min(0)
     private Integer topPerGroup = 0;
