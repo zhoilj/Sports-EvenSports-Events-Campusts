@@ -32,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -86,7 +87,8 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         }
 
         List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
-        validateRosterUsers(roster, captain.getCollege());
+        validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName());
+        roster = arrangeMixedRelayRoster(roster, item);
         ensureMembersAvailable(roster, dto.getEventId(), dto.getSportItemId(), null);
 
         RelayTeam team = new RelayTeam();
@@ -204,7 +206,8 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         SportItem item = sportItemService.getById(team.getSportItemId());
         validateRelayItem(item, team.getEventId());
         List<Long> roster = normalizeRoster(memberUserIds, team.getCreatorUserId(), item);
-        validateRosterUsers(roster, team.getCollege());
+        validateRosterUsers(roster, team.getCollege(), item, team.getClassName());
+        roster = arrangeMixedRelayRoster(roster, item);
         ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
         memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
         saveRoster(id, roster, item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount());
@@ -281,13 +284,47 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         return roster;
     }
 
-    private void validateRosterUsers(List<Long> roster, String college) {
+    private void validateRosterUsers(List<Long> roster, String college, SportItem item, String captainClass) {
         for (Long userId : roster) {
             SysUser user = requireActiveStudent(userId);
             if (!StringUtils.hasText(user.getCollege()) || !user.getCollege().equals(college)) {
                 throw new BusinessException("接力队员必须来自队伍所属学院");
             }
+            if ("B".equalsIgnoreCase(item.getDivision()) && StringUtils.hasText(captainClass)
+                    && !captainClass.equals(user.getClassName())) {
+                throw new BusinessException("乙组接力队员必须来自同一年级/专业班级，团体积分按班级归属统计");
+            }
         }
+    }
+
+    private List<Long> arrangeMixedRelayRoster(List<Long> roster, SportItem item) {
+        if (item == null || !("MIXED".equalsIgnoreCase(item.getGenderCategory())
+                || (item.getName() != null && item.getName().contains("混合接力")))) {
+            return roster;
+        }
+        int required = item.getRelayMemberCount() == null ? 4 : item.getRelayMemberCount();
+        if (required != 4) throw new BusinessException("混合接力必须配置4名正式队员");
+        List<Long> women = new ArrayList<>();
+        List<Long> men = new ArrayList<>();
+        for (Long userId : roster) {
+            SysUser user = sysUserService.getById(userId);
+            if (user == null) throw new BusinessException("接力队员账号不存在");
+            if (Objects.equals(user.getGender(), 2)) women.add(userId);
+            else if (Objects.equals(user.getGender(), 1)) men.add(userId);
+        }
+        if (women.size() < 2 || men.size() < 2) {
+            throw new BusinessException("混合接力正式队员须至少2男2女，且第1、3棒为女生，第2、4棒为男生");
+        }
+        List<Long> arranged = new ArrayList<>();
+        arranged.add(women.get(0)); // Leg 1: female
+        arranged.add(men.get(0));   // Leg 2: male
+        arranged.add(women.get(1)); // Leg 3: female
+        arranged.add(men.get(1));   // Leg 4: male
+        Set<Long> formal = new HashSet<>(arranged);
+        for (Long userId : roster) {
+            if (!formal.contains(userId)) arranged.add(userId);
+        }
+        return arranged;
     }
 
     private void ensureMembersAvailable(List<Long> roster, Long eventId, Long sportItemId, Long excludedTeamId) {
