@@ -128,6 +128,7 @@ const globalSearch = ref('')
 const eventOptions = ref<any[]>([])
 const activeEventId = ref<number | null>(null)
 
+const currentRoute = computed(() => route)
 const activeEventName = computed(() => {
   const selected = eventOptions.value.find(item => item.id === activeEventId.value)
   return selected?.name || '暂无赛事'
