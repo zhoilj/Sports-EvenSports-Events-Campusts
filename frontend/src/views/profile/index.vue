@@ -91,7 +91,7 @@ import { get, put, post } from '@/utils/request'
 const userStore = useUserStore()
 const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
 
-const userInfo = computed(() => userStore.userInfo || {})
+const userInfo = computed(() => userStore.userInfo ?? ({} as NonNullable<typeof userStore.userInfo>))
 
 const formRef = ref<FormInstance>()
 const submitLoading = ref(false)
@@ -121,7 +121,7 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-const validateConfirmPassword = (rule: any, value: string, callback: Function) => {
+const validateConfirmPassword = (_rule: any, value: string, callback: Function) => {
   if (value !== passwordForm.newPassword) {
     callback(new Error('两次输入的密码不一致'))
   } else {
@@ -160,8 +160,8 @@ async function loadUserInfo() {
   }
 }
 
-function getRoleType(role: string) {
-  const map: Record<string, string> = {
+function getRoleType(role: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     ADMIN: 'danger',
     TEACHER: 'warning',
     STUDENT: 'primary'
