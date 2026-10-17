@@ -244,7 +244,10 @@ const selectedItem = computed(() => sportItemOptions.value.find(i => i.id === cu
 const isField = computed(() => selectedItem.value?.type === 'FIELD')
 const isTrack = computed(() => selectedItem.value?.type === 'TRACK' || (selectedItem.value?.isRelay === 1 && selectedItem.value?.type !== 'FIELD'))
 const targetSchedules = computed(() => scheduleOptions.value.filter(s =>
-  s.id !== query.scheduleId && s.sportItemId === currentSchedule.value?.sportItemId && s.status === 1
+  s.id !== query.scheduleId
+  && s.sportItemId === currentSchedule.value?.sportItemId
+  && s.status === 1
+  && ['FINAL', 'FIELD_FINAL'].includes(s.roundType)
 ))
 
 onMounted(async () => {
@@ -361,7 +364,8 @@ async function openAdvanceDialog() {
     return
   }
   advanceForm.targetScheduleId = targetSchedules.value[0].id
-  advanceForm.qualifyCount = Math.min(8, Math.max(1, entryRows.value.length))
+  advanceForm.qualifyCount = currentSchedule.value?.qualificationCount
+    || Math.min(8, Math.max(1, entryRows.value.length))
   advanceForm.topPerGroup = 2
   advanceForm.groupSize = 8
   advanceDialogVisible.value = true
