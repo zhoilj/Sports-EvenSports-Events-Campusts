@@ -62,6 +62,22 @@ public class SportItem extends BaseEntity {
     @TableField("relay_reserve_count")
     private Integer relayReserveCount;
 
+    /** 1 for any team-based event, including relays and collective/fun events. */
+    @TableField("is_team_event")
+    private Integer isTeamEvent;
+
+    /** Required members for non-relay team events. */
+    @TableField("team_member_count")
+    private Integer teamMemberCount;
+
+    /** Optional reserve members for non-relay team events. */
+    @TableField("team_reserve_count")
+    private Integer teamReserveCount;
+
+    /** Maximum active teams allowed per college for this event item. */
+    @TableField("max_teams_per_college")
+    private Integer maxTeamsPerCollege;
+
     /**
      * 性别限制（0-不限 1-仅男 2-仅女）
      */
