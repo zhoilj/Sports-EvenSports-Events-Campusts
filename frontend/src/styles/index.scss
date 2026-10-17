@@ -1,3 +1,25 @@
+// 校运会平台统一视觉变量：以深绿、薄荷绿和浅灰为主色。
+:root {
+  --el-color-primary: #1f7959;
+  --el-color-primary-light-3: #55a17f;
+  --el-color-primary-light-5: #83bd9f;
+  --el-color-primary-light-7: #b5dcc6;
+  --el-color-primary-light-8: #d0e9da;
+  --el-color-primary-light-9: #e7f5ed;
+  --el-color-primary-dark-2: #175c42;
+  --el-border-radius-base: 9px;
+  --el-border-radius-small: 7px;
+}
+
+.el-card {
+  border-color: #e5ece8;
+  border-radius: 12px;
+}
+
+.el-button {
+  font-weight: 600;
+}
+
 // 全局样式
 
 * {
