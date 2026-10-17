@@ -71,6 +71,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/schedule/list.vue'),
         meta: { title: '赛程安排', icon: 'Calendar' }
       },
+      {
+        path: 'competition-operations',
+        name: 'CompetitionOperations',
+        component: () => import('@/views/competition/operations.vue'),
+        meta: { title: '竞赛执行与检录', icon: 'Finished', roles: ['ADMIN', 'TEACHER'] }
+      },
       // 成绩管理
       {
         path: 'results',
