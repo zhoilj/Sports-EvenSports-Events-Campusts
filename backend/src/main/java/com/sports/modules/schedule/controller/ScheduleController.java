@@ -40,8 +40,9 @@ public class ScheduleController {
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "10") Integer size,
             @RequestParam(required = false) Long eventId,
-            @RequestParam(required = false) String matchDate) {
-        return Result.success(scheduleService.pageSchedulesVO(current, size, eventId, matchDate));
+            @RequestParam(required = false) String matchDate,
+            @RequestParam(required = false) Long sportItemId) {
+        return Result.success(scheduleService.pageSchedulesVO(current, size, eventId, matchDate, sportItemId));
     }
 
     @Operation(summary = "获取赛程详情")
