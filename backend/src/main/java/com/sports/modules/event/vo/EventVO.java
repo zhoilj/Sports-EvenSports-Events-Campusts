@@ -64,6 +64,11 @@ public class EventVO {
     private LocalDate regEndDate;
 
     /**
+     * 每名学生最多可报名的个人项目数；0 表示不限。
+     */
+    private Integer maxItemsPerUser;
+
+    /**
      * 举办地点
      */
     private String location;
