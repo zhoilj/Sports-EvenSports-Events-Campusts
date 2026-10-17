@@ -247,8 +247,8 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         Map<Integer, Integer> pointsByPlace = scoringRuleMapper.selectList(new LambdaQueryWrapper<ScoringRule>()
                         .eq(ScoringRule::getEventId, schedule.getEventId()))
                 .stream().collect(Collectors.toMap(ScoringRule::getPlaceNo, ScoringRule::getPoints, (a, b) -> a));
-        if (scoringRound && pointsByPlace.isEmpty()) {
-            throw new BusinessException("正式发布决赛成绩前，请先在“学院积分与奖牌榜”配置本届名次积分规则");
+        if (scoringRound && !java.util.stream.IntStream.rangeClosed(1, 8).allMatch(pointsByPlace::containsKey)) {
+            throw new BusinessException("正式发布决赛成绩前，请先在“学院积分与奖牌榜”保存完整的第1至第8名积分规则");
         }
         if (results.stream().anyMatch(r -> Objects.equals(r.getIsPublished(), 1))) {
             throw new BusinessException("该赛程已有正式发布的成绩，不能重复发布");
