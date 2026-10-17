@@ -9,9 +9,9 @@ spring:
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
-    username: root
-    password: root
+    url: ${DB_URL:jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     druid:
       initial-size: 5
       min-idle: 5
@@ -58,8 +58,9 @@ mybatis-plus:
 
 # JWT配置
 jwt:
-  secret: SportEventsSecretKey2024SportEventsSecretKey2024SportEventsSecretKey2024
-  expiration: 86400000  # 24小时
+  # Required environment variable. Use a random secret with at least 32 bytes for HS256.
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}  # 24小时
   header: Authorization
   prefix: "Bearer "
 
@@ -85,5 +86,5 @@ knife4j:
 # 日志配置
 logging:
   level:
-    com.sports: debug
-    org.springframework.security: debug
+    com.sports: ${APP_LOG_LEVEL:INFO}
+    org.springframework.security: ${SECURITY_LOG_LEVEL:INFO}
