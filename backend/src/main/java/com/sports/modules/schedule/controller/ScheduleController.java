@@ -5,6 +5,11 @@ import com.sports.common.exception.BusinessException;
 import com.sports.common.result.Result;
 import com.sports.common.result.ResultCode;
 import com.sports.modules.schedule.entity.Schedule;
+import com.sports.modules.schedule.dto.ScheduleEntryGenerateDTO;
+import com.sports.modules.schedule.dto.AdvanceEntriesDTO;
+import com.sports.modules.schedule.service.ScheduleEntryService;
+import com.sports.modules.schedule.vo.ScheduleEntryVO;
+import com.sports.modules.schedule.vo.ScheduleConflictVO;
 import com.sports.modules.schedule.service.ScheduleService;
 import com.sports.modules.schedule.vo.ScheduleVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
+    private final ScheduleEntryService scheduleEntryService;
 
     @Operation(summary = "分页查询赛程")
     @GetMapping
@@ -51,10 +57,10 @@ public class ScheduleController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Long> create(@Valid @RequestBody Schedule schedule) {
-        // 设置默认状态
-        if (schedule.getStatus() == null) {
-            schedule.setStatus(1);
-        }
+        // 设置默认状态和轮次类型。
+        if (schedule.getStatus() == null) schedule.setStatus(1);
+        if (schedule.getRoundType() == null) schedule.setRoundType("FINAL");
+        scheduleService.validateSchedule(schedule, null);
         scheduleService.save(schedule);
         return Result.success(schedule.getId());
     }
@@ -68,6 +74,8 @@ public class ScheduleController {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
         }
         schedule.setId(id);
+        if (schedule.getRoundType() == null) schedule.setRoundType(existing.getRoundType() == null ? "FINAL" : existing.getRoundType());
+        scheduleService.validateSchedule(schedule, id);
         scheduleService.updateById(schedule);
         return Result.success();
     }
@@ -82,6 +90,37 @@ public class ScheduleController {
         }
         scheduleService.removeById(id);
         return Result.success();
+    }
+
+    @Operation(summary = "查询赛程参赛名单")
+    @GetMapping("/{id}/entries")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<java.util.List<ScheduleEntryVO>> getEntries(@PathVariable Long id) {
+        return Result.success(scheduleEntryService.listEntryDetails(id));
+    }
+
+    @Operation(summary = "检查参赛者赛程时间冲突")
+    @GetMapping("/{id}/conflicts")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<java.util.List<ScheduleConflictVO>> getConflicts(@PathVariable Long id) {
+        return Result.success(scheduleEntryService.checkTimeConflicts(id));
+    }
+
+    @Operation(summary = "按已通过报名生成分组分道")
+    @PostMapping("/{id}/entries/generate")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Integer> generateEntries(@PathVariable Long id,
+                                           @Valid @RequestBody(required = false) ScheduleEntryGenerateDTO dto) {
+        int groupSize = dto == null || dto.getGroupSize() == null ? 8 : dto.getGroupSize();
+        int laneCount = dto == null || dto.getLaneCount() == null ? 8 : dto.getLaneCount();
+        return Result.success("已生成参赛名单", scheduleEntryService.generateEntries(id, groupSize, laneCount));
+    }
+
+    @Operation(summary = "按预赛成绩晋级下一轮")
+    @PostMapping("/advance")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Integer> advanceEntries(@Valid @RequestBody AdvanceEntriesDTO dto) {
+        return Result.success("晋级名单已生成", scheduleEntryService.advanceEntries(dto));
     }
 
     @Operation(summary = "开始比赛")
