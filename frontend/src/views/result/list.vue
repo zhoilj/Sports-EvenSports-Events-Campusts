@@ -100,7 +100,7 @@
         <el-form-item label="参赛主体">
           <el-radio-group v-model="formData.entryType" :disabled="!!editingId" @change="loadParticipants">
             <el-radio label="INDIVIDUAL">个人</el-radio>
-            <el-radio label="RELAY">接力队伍</el-radio>
+            <el-radio label="RELAY">{{ formData.sportItemId && formSportItemOptions.find(item => item.id === formData.sportItemId)?.isRelay === 1 ? '接力队伍' : '集体/民体/趣味队伍' }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="formData.entryType === 'INDIVIDUAL'" label="已通过报名" prop="registrationId">
@@ -341,7 +341,7 @@ async function onSportItemChange(sportItemId: number | null) {
   }
   formScheduleOptions.value = allFormScheduleOptions.value.filter(s => s.sportItemId === sportItemId)
   const selected = formSportItemOptions.value.find(item => item.id === sportItemId)
-  if (selected?.isRelay === 1) formData.entryType = 'RELAY'
+  if (selected?.isRelay === 1 || selected?.isTeamEvent === 1) formData.entryType = 'RELAY'
   else formData.entryType = 'INDIVIDUAL'
   await loadParticipants()
 }
