@@ -31,8 +31,13 @@
         <el-table-column prop="name" label="项目名称" width="150" />
         <el-table-column prop="categoryName" label="类别" width="100" />
         <el-table-column prop="genderLimitName" label="性别限制" width="100" />
-        <el-table-column prop="maxParticipants" label="人数上限" width="100" />
-        <el-table-column prop="currentParticipants" label="已报名" width="100" />
+        <el-table-column prop="maxParticipants" label="人数上限" width="100">
+          <template #default="{ row }">{{ row.maxParticipants > 0 ? row.maxParticipants : '不限' }}</template>
+        </el-table-column>
+        <el-table-column prop="currentParticipants" label="有效报名" width="100" />
+        <el-table-column prop="isRelay" label="项目形式" width="100">
+          <template #default="{ row }">{{ row.isRelay === 1 ? '接力项目' : '个人项目' }}</template>
+        </el-table-column>
         <el-table-column prop="rules" label="比赛规则" min-width="200" show-overflow-tooltip />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -83,8 +88,20 @@
           </el-select>
         </el-form-item>
         <el-form-item label="人数上限" prop="maxParticipants">
-          <el-input-number v-model="formData.maxParticipants" :min="1" :max="1000" />
+          <el-input-number v-model="formData.maxParticipants" :min="0" :max="1000" />
+          <span class="form-tip">0 表示不限人数</span>
         </el-form-item>
+        <el-form-item label="接力项目">
+          <el-switch v-model="formData.isRelay" :active-value="1" :inactive-value="0" />
+        </el-form-item>
+        <template v-if="formData.isRelay === 1">
+          <el-form-item label="正式队员数" prop="relayMemberCount">
+            <el-input-number v-model="formData.relayMemberCount" :min="2" :max="12" />
+          </el-form-item>
+          <el-form-item label="替补人数" prop="relayReserveCount">
+            <el-input-number v-model="formData.relayReserveCount" :min="0" :max="6" />
+          </el-form-item>
+        </template>
         <el-form-item label="比赛规则" prop="rules">
           <el-input v-model="formData.rules" type="textarea" :rows="3" placeholder="请输入比赛规则" />
         </el-form-item>
@@ -126,6 +143,9 @@ const formData = reactive({
   type: 'TRACK',
   genderLimit: 0,
   maxParticipants: 100,
+  isRelay: 0,
+  relayMemberCount: 4,
+  relayReserveCount: 0,
   rules: ''
 })
 
@@ -172,7 +192,8 @@ function handleAdd() {
   dialogTitle.value = '新增项目'
   Object.assign(formData, {
     eventId: null, name: '', type: 'TRACK',
-    genderLimit: 0, maxParticipants: 100, rules: ''
+    genderLimit: 0, maxParticipants: 100, isRelay: 0,
+    relayMemberCount: 4, relayReserveCount: 0, rules: ''
   })
   dialogVisible.value = true
 }
