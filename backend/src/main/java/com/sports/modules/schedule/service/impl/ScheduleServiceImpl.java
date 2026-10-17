@@ -193,9 +193,7 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     private String fieldAreaKey(SportItem item) {
         String name = item.getName() == null ? "" : item.getName();
         String project = name.replaceAll("甲组|乙组|教工组|男子|女子|混合|决赛|预赛|田赛|\\s", "");
-        String gender = item.getGenderCategory() == null ? "OPEN" : item.getGenderCategory();
-        String division = item.getDivision() == null ? "OPEN" : item.getDivision();
-        return project + "|" + division + "|" + gender;
+        return project;
     }
 
     @Override
