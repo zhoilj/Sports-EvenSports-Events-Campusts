@@ -204,9 +204,9 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
     }
 
     @Override
-    public IPage<RegistrationVO> pageRegistrations(Integer current, Integer size, Long eventId, Long sportItemId, String status) {
+    public IPage<RegistrationVO> pageRegistrations(Integer current, Integer size, Long eventId,
+                                                   Long sportItemId, String status, String college, String className) {
         Page<Registration> page = new Page<>(current, size);
-
         Integer statusCode = parseStatus(status);
         LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, Registration::getEventId, eventId)
@@ -214,10 +214,22 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
                 .eq(statusCode != null, Registration::getStatus, statusCode)
                 .orderByDesc(Registration::getCreateTime);
 
-        IPage<Registration> registrationPage = this.page(page, wrapper);
+        if (StringUtils.hasText(college) || StringUtils.hasText(className)) {
+            LambdaQueryWrapper<SysUser> userWrapper = new LambdaQueryWrapper<SysUser>()
+                    .like(StringUtils.hasText(college), SysUser::getCollege, college)
+                    .like(StringUtils.hasText(className), SysUser::getClassName, className);
+            List<Long> matchedUserIds = sysUserService.list(userWrapper).stream()
+                    .map(SysUser::getId)
+                    .collect(Collectors.toList());
+            if (matchedUserIds.isEmpty()) {
+                Page<RegistrationVO> emptyPage = new Page<>(current, size, 0);
+                emptyPage.setRecords(List.of());
+                return emptyPage;
+            }
+            wrapper.in(Registration::getUserId, matchedUserIds);
+        }
 
-        // 使用批量转换优化N+1查询
-        return convertToVOPage(registrationPage);
+        return convertToVOPage(this.page(page, wrapper));
     }
 
     @Override
@@ -313,6 +325,8 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
                 vo.setRealName(user.getRealName());
                 vo.setStudentNo(user.getStudentNo());
                 vo.setCollege(user.getCollege());
+                vo.setClassName(user.getClassName());
+                vo.setPhone(user.getPhone());
             }
 
             if (registration.getReviewerId() != null) {
