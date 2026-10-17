@@ -253,6 +253,14 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         this.removeById(id);
     }
 
+    @Override
+    public List<ResultAuditLog> getAuditLogs(Long id) {
+        if (this.getById(id) == null) throw new BusinessException("成绩记录不存在");
+        return resultAuditLogMapper.selectList(new LambdaQueryWrapper<ResultAuditLog>()
+                .eq(ResultAuditLog::getResultId, id)
+                .orderByDesc(ResultAuditLog::getOperatedAt));
+    }
+
     private void prepareAndValidateResult(CompetitionResult result) {
         if (result.getEventId() == null || result.getSportItemId() == null) {
             throw new BusinessException("赛事和比赛项目不能为空");
