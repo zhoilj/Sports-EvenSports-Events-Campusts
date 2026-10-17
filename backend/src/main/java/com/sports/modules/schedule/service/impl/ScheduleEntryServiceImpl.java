@@ -82,8 +82,10 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             throw new BusinessException("该项目已停用，不能生成参赛名单");
         }
         boolean relay = Objects.equals(item.getIsRelay(), 1);
+        boolean teamEvent = Objects.equals(item.getIsTeamEvent(), 1);
         boolean field = "FIELD".equalsIgnoreCase(item.getType());
-        if (!field && !relay && groupSize > laneCount) {
+        boolean orderBased = field || (teamEvent && !relay);
+        if (!orderBased && !relay && groupSize > laneCount) {
             throw new BusinessException("径赛每组人数不能超过可用道数");
         }
         if ("FINAL".equalsIgnoreCase(schedule.getRoundType()) || "SEMIFINAL".equalsIgnoreCase(schedule.getRoundType())) {
@@ -100,7 +102,7 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         }
 
         List<ScheduleEntry> candidates = new ArrayList<>();
-        if (relay) {
+        if (teamEvent) {
             List<RelayTeam> teams = relayTeamService.list(new LambdaQueryWrapper<RelayTeam>()
                     .eq(RelayTeam::getEventId, schedule.getEventId())
                     .eq(RelayTeam::getSportItemId, schedule.getSportItemId())
@@ -128,15 +130,15 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             }
         }
         if (candidates.isEmpty()) {
-            throw new BusinessException(relay ? "该项目没有已通过审核的接力队伍" : "该项目没有已通过审核的报名记录");
+            throw new BusinessException(teamEvent ? "该项目没有已审核通过的参赛队伍" : "该项目没有已通过审核的报名记录");
         }
 
-        int perGroup = field ? candidates.size() : Math.min(groupSize, laneCount);
+        int perGroup = orderBased ? candidates.size() : Math.min(groupSize, laneCount);
         for (int i = 0; i < candidates.size(); i++) {
             ScheduleEntry entry = candidates.get(i);
             entry.setStartOrder(i + 1);
-            entry.setGroupNo(field ? "A" : groupLabel(i / perGroup));
-            entry.setLaneNo(field ? null : (i % perGroup) + 1);
+            entry.setGroupNo(orderBased ? "1" : groupLabel(i / perGroup));
+            entry.setLaneNo(orderBased ? null : (i % perGroup) + 1);
         }
         List<ScheduleConflictVO> conflicts = findConflicts(schedule, candidates);
         if (!conflicts.isEmpty()) {
@@ -172,7 +174,8 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         Map<Long, ScheduleEntry> entriesById = existingEntries.stream()
                 .collect(Collectors.toMap(ScheduleEntry::getId, entry -> entry));
         SportItem item = sportItemService.getById(schedule.getSportItemId());
-        boolean field = item != null && "FIELD".equalsIgnoreCase(item.getType());
+        boolean field = item != null && ("FIELD".equalsIgnoreCase(item.getType())
+                || (Objects.equals(item.getIsTeamEvent(), 1) && !Objects.equals(item.getIsRelay(), 1)));
         Set<Long> seenIds = new HashSet<>();
         Set<String> laneKeys = new HashSet<>();
         Set<String> orderKeys = new HashSet<>();
@@ -320,8 +323,9 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         }
         SportItem targetItem = sportItemService.getById(target.getSportItemId());
         if (targetItem == null) throw new BusinessException("晋级目标项目不存在");
-        if ("FIELD".equalsIgnoreCase(targetItem.getType())) {
-            throw new BusinessException("田赛项目不使用径赛晋级编排");
+        if ("FIELD".equalsIgnoreCase(targetItem.getType())
+                || (Objects.equals(targetItem.getIsTeamEvent(), 1) && !Objects.equals(targetItem.getIsRelay(), 1))) {
+            throw new BusinessException("田赛和集体队伍项目不使用径赛晋级编排");
         }
         if (this.count(new LambdaQueryWrapper<ScheduleEntry>().eq(ScheduleEntry::getScheduleId, target.getId())) > 0) {
             throw new BusinessException("目标赛程已有参赛名单，不能重复晋级");
