@@ -2,6 +2,10 @@
 -- Additive and safe to rerun against the current schema. Back up the database first.
 
 SET @sports_db = DATABASE();
+SET @had_result_workflow = EXISTS(
+  SELECT 1 FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA=@sports_db AND TABLE_NAME='result' AND COLUMN_NAME='is_published'
+);
 
 SET @sql = IF(
   EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@sports_db AND TABLE_NAME='schedule' AND COLUMN_NAME='round_type'),
@@ -117,5 +121,11 @@ SET @sql = IF(
 PREPARE sports_stmt FROM @sql; EXECUTE sports_stmt; DEALLOCATE PREPARE sports_stmt;
 
 UPDATE result SET result_status='VALID' WHERE result_status IS NULL OR result_status='';
-UPDATE result SET review_status=2, is_published=1
-WHERE is_published=0 AND review_status=1 AND result_id IS NULL;
+-- On the first migration only, retain legacy results as already reviewed and published.
+-- The guard prevents subsequent reruns from publishing newly entered draft results.
+SET @sql = IF(
+  @had_result_workflow = 0,
+  'UPDATE result SET review_status=2, is_published=1, published_at=COALESCE(record_time, create_time) WHERE is_published=0 AND review_status=1 AND relay_team_id IS NULL',
+  'SELECT 1'
+);
+PREPARE sports_stmt FROM @sql; EXECUTE sports_stmt; DEALLOCATE PREPARE sports_stmt;
