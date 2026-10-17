@@ -6,6 +6,7 @@ import com.sports.common.result.Result;
 import com.sports.common.result.ResultCode;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.service.ScheduleService;
+import com.sports.modules.schedule.service.ScheduleEntryService;
 import com.sports.modules.schedule.vo.ScheduleVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 public class ScheduleController {
 
     private final ScheduleService scheduleService;
+    private final ScheduleEntryService scheduleEntryService;
 
     @Operation(summary = "分页查询赛程")
     @GetMapping
@@ -67,6 +69,11 @@ public class ScheduleController {
         if (existing == null) {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
         }
+        if (scheduleEntryService.hasEntries(id)
+                && (!java.util.Objects.equals(existing.getEventId(), schedule.getEventId())
+                || !java.util.Objects.equals(existing.getSportItemId(), schedule.getSportItemId()))) {
+            throw new BusinessException("该场次已生成参赛编排，不能更换所属赛事或运动项目");
+        }
         schedule.setId(id);
         scheduleService.updateById(schedule);
         return Result.success();
@@ -79,6 +86,9 @@ public class ScheduleController {
         Schedule existing = scheduleService.getById(id);
         if (existing == null) {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
+        }
+        if (scheduleEntryService.hasEntries(id)) {
+            throw new BusinessException("该场次已有参赛编排记录，请先移除参赛记录后再删除赛程");
         }
         scheduleService.removeById(id);
         return Result.success();
