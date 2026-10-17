@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 赛程 Controller
@@ -68,6 +69,7 @@ public class ScheduleController {
     @Operation(summary = "更新赛程")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody Schedule schedule) {
         Schedule existing = scheduleService.getById(id);
         if (existing == null) {
@@ -77,6 +79,10 @@ public class ScheduleController {
         if (schedule.getRoundType() == null) schedule.setRoundType(existing.getRoundType() == null ? "FINAL" : existing.getRoundType());
         scheduleService.validateSchedule(schedule, id);
         scheduleService.updateById(schedule);
+        java.util.List<ScheduleConflictVO> conflicts = scheduleEntryService.checkTimeConflicts(id);
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("修改赛程后出现参赛者时间冲突：" + conflicts.get(0).getMessage());
+        }
         return Result.success();
     }
 
@@ -127,6 +133,10 @@ public class ScheduleController {
     @PostMapping("/{id}/start")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> startMatch(@PathVariable Long id) {
+        java.util.List<ScheduleConflictVO> conflicts = scheduleEntryService.checkTimeConflicts(id);
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("当前赛程存在参赛者时间冲突，不能开始：" + conflicts.get(0).getMessage());
+        }
         scheduleService.startMatch(id);
         return Result.success();
     }
