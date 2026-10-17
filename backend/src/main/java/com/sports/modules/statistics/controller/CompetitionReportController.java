@@ -81,7 +81,7 @@ public class CompetitionReportController {
                 .eq(CompetitionResult::getIsPublished, 1)
                 .orderByAsc(CompetitionResult::getSportItemId)
                 .orderByAsc(CompetitionResult::getRanking));
-        StringBuilder csv = new StringBuilder("\uFEFF赛事,项目,轮次,比赛日期,参赛者/队伍,学号,学院,成绩,状态,名次,积分,发布时间\r\n");
+        StringBuilder csv = new StringBuilder("\uFEFF赛事,项目,轮次,比赛日期,参赛者/队伍,学号,学院,成绩,破纪录,状态,名次,积分,发布时间\r\n");
         for (CompetitionResult result : results) {
             SportItem item = sportItemService.getById(result.getSportItemId());
             Schedule schedule = result.getScheduleId() == null ? null : scheduleService.getById(result.getScheduleId());
@@ -114,6 +114,7 @@ public class CompetitionReportController {
                     .append(csv(studentNo)).append(',')
                     .append(csv(college)).append(',')
                     .append(csv(score)).append(',')
+                    .append(csv(Objects.equals(result.getIsRecord(), 1) ? "是" : "否")).append(',')
                     .append(csv(result.getResultStatus())).append(',')
                     .append(csv(result.getRanking())).append(',')
                     .append(csv(result.getPoints())).append(',')
