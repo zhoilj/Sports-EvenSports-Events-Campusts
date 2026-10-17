@@ -83,6 +83,60 @@ public class ScheduleServiceImpl extends ServiceImpl<ScheduleMapper, Schedule> i
     }
 
     @Override
+    public void validateSchedule(Schedule schedule, Long excludeId) {
+        if (schedule == null || schedule.getEventId() == null || schedule.getSportItemId() == null) {
+            throw new BusinessException("赛事和比赛项目不能为空");
+        }
+        if (schedule.getMatchDate() == null || schedule.getStartTime() == null) {
+            throw new BusinessException("比赛日期和开始时间不能为空");
+        }
+        if (schedule.getEndTime() != null && !schedule.getEndTime().isAfter(schedule.getStartTime())) {
+            throw new BusinessException("结束时间必须晚于开始时间");
+        }
+
+        Event event = eventService.getById(schedule.getEventId());
+        if (event == null) {
+            throw new BusinessException(ResultCode.EVENT_NOT_FOUND);
+        }
+        if (event.getStartDate() != null && schedule.getMatchDate().isBefore(event.getStartDate())
+                || event.getEndDate() != null && schedule.getMatchDate().isAfter(event.getEndDate())) {
+            throw new BusinessException("比赛日期必须位于赛事开始和结束日期之间");
+        }
+
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        if (item == null || !java.util.Objects.equals(item.getEventId(), schedule.getEventId())) {
+            throw new BusinessException("所选比赛项目不属于当前赛事");
+        }
+
+        String roundType = schedule.getRoundType();
+        if (roundType != null && !java.util.Set.of("PRELIMINARY", "SEMIFINAL", "FINAL", "FIELD_FINAL").contains(roundType)) {
+            throw new BusinessException("比赛轮次类型无效");
+        }
+
+        java.time.LocalTime proposedEnd = schedule.getEndTime() == null
+                ? schedule.getStartTime().plusHours(1) : schedule.getEndTime();
+        List<Schedule> sameDay = this.list(new LambdaQueryWrapper<Schedule>()
+                .eq(Schedule::getMatchDate, schedule.getMatchDate())
+                .ne(excludeId != null, Schedule::getId, excludeId)
+                .ne(Schedule::getStatus, 4));
+        for (Schedule existing : sameDay) {
+            if (!StringUtils.hasText(schedule.getLocation()) || !StringUtils.hasText(existing.getLocation())
+                    || !schedule.getLocation().trim().equalsIgnoreCase(existing.getLocation().trim())) {
+                continue;
+            }
+            java.time.LocalTime existingEnd = existing.getEndTime() == null
+                    ? existing.getStartTime().plusHours(1) : existing.getEndTime();
+            boolean overlaps = schedule.getStartTime().isBefore(existingEnd)
+                    && existing.getStartTime().isBefore(proposedEnd);
+            if (overlaps) {
+                throw new BusinessException("场地时间冲突：场地“" + schedule.getLocation() + "”在"
+                        + existing.getStartTime() + "—" + existingEnd + "已有赛程“"
+                        + existing.getScheduleName() + "”（赛程ID " + existing.getId() + "）");
+            }
+        }
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void startMatch(Long id) {
         Schedule schedule = this.getById(id);
