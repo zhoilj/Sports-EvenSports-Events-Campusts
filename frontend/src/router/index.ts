@@ -23,81 +23,81 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '首页', icon: 'HomeFilled' }
+        meta: { title: '赛事总览', icon: 'HomeFilled' }
       },
       // 赛事管理
       {
         path: 'events',
         name: 'Events',
         component: () => import('@/views/event/list.vue'),
-        meta: { title: '赛事管理', icon: 'Trophy', roles: ['ADMIN', 'TEACHER'] }
+        meta: { title: '赛事管理', icon: 'Trophy', roles: ['ADMIN', 'TEACHER'], menuGroup: '赛事筹备', menuGroupIcon: 'Trophy' }
       },
       {
         path: 'events/:id',
         name: 'EventDetail',
         component: () => import('@/views/event/detail.vue'),
-        meta: { title: '赛事详情', hidden: true }
+        meta: { title: '赛事详情', hidden: true, activeMenu: '/events' }
       },
       // 运动项目
       {
         path: 'sport-items',
         name: 'SportItems',
         component: () => import('@/views/sportitem/list.vue'),
-        meta: { title: '运动项目', icon: 'Football', roles: ['ADMIN', 'TEACHER'] }
+        meta: { title: '竞赛项目', icon: 'Football', roles: ['ADMIN', 'TEACHER'], menuGroup: '赛事筹备', menuGroupIcon: 'Trophy' }
       },
       // 报名管理
       {
         path: 'registrations',
         name: 'Registrations',
         component: () => import('@/views/registration/list.vue'),
-        meta: { title: '报名管理', icon: 'Document', roles: ['ADMIN', 'TEACHER'] }
+        meta: { title: '报名与队伍', icon: 'Document', roles: ['ADMIN', 'TEACHER'], menuGroup: '赛事筹备', menuGroupIcon: 'Trophy' }
       },
       {
         path: 'my-registrations',
         name: 'MyRegistrations',
         component: () => import('@/views/registration/my.vue'),
-        meta: { title: '我的报名', icon: 'Tickets', roles: ['STUDENT'] }
+        meta: { title: '我的报名', icon: 'Tickets', roles: ['STUDENT'], menuGroup: '我的参赛', menuGroupIcon: 'User' }
       },
       // 赛程管理
       {
         path: 'schedules',
         name: 'Schedules',
         component: () => import('@/views/schedule/list.vue'),
-        meta: { title: '赛程安排', icon: 'Calendar' }
+        meta: { title: '赛程安排', icon: 'Calendar', menuGroup: '赛务信息', menuGroupIcon: 'Calendar' }
       },
       // 成绩管理
       {
         path: 'results',
         name: 'Results',
         component: () => import('@/views/result/list.vue'),
-        meta: { title: '成绩管理', icon: 'Medal', roles: ['ADMIN', 'TEACHER'] }
+        meta: { title: '成绩管理', icon: 'Medal', roles: ['ADMIN', 'TEACHER'], menuGroup: '成绩与统计', menuGroupIcon: 'DataAnalysis' }
       },
       {
         path: 'my-results',
         name: 'MyResults',
         component: () => import('@/views/result/my.vue'),
-        meta: { title: '我的成绩', icon: 'DataLine', roles: ['STUDENT'] }
+        meta: { title: '我的成绩', icon: 'DataLine', roles: ['STUDENT'], menuGroup: '我的参赛', menuGroupIcon: 'User' }
       },
       // 新闻公告
       {
         path: 'news',
         name: 'News',
         component: () => import('@/views/news/list.vue'),
-        meta: { title: '新闻公告', icon: 'Bell' }
+        meta: { title: '赛事公告', icon: 'Bell', menuGroup: '赛务信息', menuGroupIcon: 'Calendar' }
       },
       // 用户管理
       {
         path: 'users',
         name: 'Users',
         component: () => import('@/views/user/list.vue'),
-        meta: { title: '用户管理', icon: 'User', roles: ['ADMIN'] }
+        meta: { title: '用户与权限', icon: 'User', roles: ['ADMIN'] }
       },
       // 统计分析
       {
         path: 'statistics',
         name: 'Statistics',
         component: () => import('@/views/statistics/index.vue'),
-        meta: { title: '统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'] }
+        meta: { title: '赛事统计分析', icon: 'DataAnalysis', roles: ['ADMIN', 'TEACHER'], menuGroup: '成绩与统计', menuGroupIcon: 'DataAnalysis' }
       },
       // 个人中心
       {
