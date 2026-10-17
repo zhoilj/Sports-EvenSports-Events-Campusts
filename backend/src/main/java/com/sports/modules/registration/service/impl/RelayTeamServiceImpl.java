@@ -211,15 +211,29 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
     }
 
     @Override
-    public List<RelayTeamMemberVO> getEligibleMembers(String keyword) {
+    public List<RelayTeamMemberVO> getEligibleMembers(Long sportItemId, Long teamId, String keyword) {
         SysUser captain = requireActiveStudent(SecurityUtils.getUserId());
         if (!StringUtils.hasText(captain.getCollege())) {
             throw new BusinessException("请先完善个人资料中的学院信息");
+        }
+        Set<Long> occupiedUserIds = new HashSet<>();
+        if (sportItemId != null) {
+            List<Long> occupiedTeamIds = this.list(new LambdaQueryWrapper<RelayTeam>()
+                            .eq(RelayTeam::getSportItemId, sportItemId)
+                            .ne(teamId != null, RelayTeam::getId, teamId)
+                            .in(RelayTeam::getStatus, 1, 2))
+                    .stream().map(RelayTeam::getId).collect(Collectors.toList());
+            if (!occupiedTeamIds.isEmpty()) {
+                occupiedUserIds.addAll(memberMapper.selectList(new LambdaQueryWrapper<RelayTeamMember>()
+                                .in(RelayTeamMember::getTeamId, occupiedTeamIds))
+                        .stream().map(RelayTeamMember::getUserId).collect(Collectors.toSet()));
+            }
         }
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getRole, "STUDENT")
                 .eq(SysUser::getStatus, 1)
                 .eq(SysUser::getCollege, captain.getCollege())
+                .notIn(!occupiedUserIds.isEmpty(), SysUser::getId, occupiedUserIds)
                 .and(StringUtils.hasText(keyword), q -> q.like(SysUser::getRealName, keyword)
                         .or().like(SysUser::getStudentNo, keyword)
                         .or().like(SysUser::getClassName, keyword))
