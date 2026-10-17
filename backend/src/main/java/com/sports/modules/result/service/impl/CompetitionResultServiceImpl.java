@@ -23,6 +23,8 @@ import com.sports.modules.result.service.CompetitionResultService;
 import com.sports.modules.result.vo.CompetitionResultVO;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.entity.ScheduleEntry;
+import com.sports.modules.schedule.entity.CheckinRecord;
+import com.sports.modules.schedule.mapper.CheckinRecordMapper;
 import com.sports.modules.schedule.mapper.ScheduleEntryMapper;
 import com.sports.modules.schedule.service.ScheduleService;
 import com.sports.modules.sportitem.entity.SportItem;
@@ -60,6 +62,7 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     private final RelayTeamMemberMapper relayTeamMemberMapper;
     private final ScheduleService scheduleService;
     private final ScheduleEntryMapper scheduleEntryMapper;
+    private final CheckinRecordMapper checkinRecordMapper;
     private final ScoringRuleMapper scoringRuleMapper;
     private final ResultAuditLogMapper resultAuditLogMapper;
 
@@ -213,6 +216,11 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         Map<String, CompetitionResult> resultByParticipant = results.stream()
                 .collect(Collectors.toMap(this::participantKey, r -> r, (left, right) -> left));
         for (ScheduleEntry entry : entries) {
+            CheckinRecord checkin = checkinRecordMapper.selectOne(new LambdaQueryWrapper<CheckinRecord>()
+                    .eq(CheckinRecord::getScheduleEntryId, entry.getId()));
+            if (checkin == null || "PENDING".equals(checkin.getStatus())) {
+                throw new BusinessException("参赛名单仍有未完成检录的人员，不能发布正式成绩");
+            }
             String key = entry.getRegistrationId() != null
                     ? "R:" + entry.getRegistrationId() : "T:" + entry.getRelayTeamId();
             CompetitionResult result = resultByParticipant.get(key);
@@ -221,6 +229,11 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
             }
             if (!Objects.equals(result.getReviewStatus(), 2)) {
                 throw new BusinessException("所有参赛成绩必须先复核通过，才能正式发布");
+            }
+            if ("ABSENT".equals(checkin.getStatus()) && !"DNS".equals(result.getResultStatus())
+                    || "WITHDRAWN".equals(checkin.getStatus()) && !"WD".equals(result.getResultStatus())
+                    || "DQ".equals(checkin.getStatus()) && !"DQ".equals(result.getResultStatus())) {
+                throw new BusinessException("检录异常状态与成绩状态不一致，请先核对");
             }
         }
         if (results.isEmpty()) throw new BusinessException("该赛程暂无成绩记录");
