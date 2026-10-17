@@ -73,7 +73,7 @@
         <el-descriptions-item label="参赛方式">{{ currentRow.registrationType === 'RELAY' ? '接力' : '个人' }}</el-descriptions-item>
         <el-descriptions-item label="队伍名称">{{ currentRow.teamName || '—' }}</el-descriptions-item>
         <el-descriptions-item label="接力队员" :span="2">
-          <span v-if="currentRow.members?.length">{{ currentRow.members.map((member: any) => member.memberOrder + '. ' + member.realName + '（' + member.studentNo + '）').join('、') }}</span>
+          <span v-if="currentRow.members?.length">{{ currentRow.members.map((member) => member.memberOrder + '. ' + member.realName + '（' + member.studentNo + '）').join('、') }}</span>
           <span v-else>—</span>
         </el-descriptions-item>
         <el-descriptions-item label="报名人">{{ currentRow.realName }}</el-descriptions-item>
