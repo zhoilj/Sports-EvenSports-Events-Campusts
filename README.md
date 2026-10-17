@@ -57,6 +57,28 @@ mysql -u root -p sports_events < docs/04-DB/schema.sql
 mysql -u root -p sports_events < backend/src/main/resources/db/data.sql
 ```
 
+### 安全环境变量配置
+
+不要将真实数据库密码或 JWT 密钥写入 `application.yml` 或提交到 Git。启动后端前设置：
+
+```bash
+export DB_URL='jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8'
+export DB_USERNAME='your_database_user'
+export DB_PASSWORD='your_database_password'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-bytes-long'
+```
+
+Windows PowerShell 示例：
+
+```powershell
+$env:DB_URL = 'jdbc:mysql://localhost:3306/sports_events?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8'
+$env:DB_USERNAME = 'your_database_user'
+$env:DB_PASSWORD = 'your_database_password'
+$env:JWT_SECRET = 'replace-with-a-random-secret-at-least-32-bytes-long'
+```
+
+新增校运会业务表的增量迁移位于 `backend/src/main/resources/db/migration/V1__campus_track_meet_additive.sql`。执行前请先备份数据库，并确认原有表结构与迁移前置条件。**不要在已有业务数据库上重新执行 `docs/04-DB/schema.sql`**，该初始化脚本含有 `DROP TABLE` 语句。
+
 ### 后端启动
 
 ```bash
