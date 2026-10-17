@@ -10,6 +10,7 @@ import java.util.List;
 
 public interface ScheduleEntryService extends IService<ScheduleEntry> {
     List<ScheduleEntryVO> listByScheduleId(Long scheduleId);
+    boolean hasEntries(Long scheduleId);
     List<ScheduleEntryVO> listMyEntries();
     int autoAssign(Long scheduleId, Integer laneCount);
     void updateAssignment(Long id, ScheduleEntryAssignmentDTO dto);
