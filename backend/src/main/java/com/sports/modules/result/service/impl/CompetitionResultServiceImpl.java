@@ -353,8 +353,8 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
         if (scheduleId == null) query.isNull(CompetitionResult::getScheduleId);
         else query.eq(CompetitionResult::getScheduleId, scheduleId);
         List<CompetitionResult> ranked = this.list(query);
-        boolean ascending = "ASC".equalsIgnoreCase(item.getSortRule())
-                || (item.getSortRule() == null && "TIME".equalsIgnoreCase(item.getScoreType()));
+        boolean ascending = "TIME".equalsIgnoreCase(item.getScoreType())
+                || "ASC".equalsIgnoreCase(item.getSortRule());
         Comparator<CompetitionResult> comparator = Comparator.comparing(CompetitionResult::getScore);
         if (!ascending) comparator = comparator.reversed();
         ranked.sort(comparator);
