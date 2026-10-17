@@ -80,10 +80,16 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     @Override
     public List<CompetitionResult> getRankingByEventAndItem(Long eventId, Long sportItemId) {
         return this.list(new LambdaQueryWrapper<CompetitionResult>()
-                .eq(CompetitionResult::getEventId, eventId)
-                .eq(CompetitionResult::getSportItemId, sportItemId)
-                .eq(CompetitionResult::getIsPublished, 1)
-                .orderByAsc(CompetitionResult::getRanking));
+                        .eq(CompetitionResult::getEventId, eventId)
+                        .eq(CompetitionResult::getSportItemId, sportItemId)
+                        .eq(CompetitionResult::getIsPublished, 1)
+                        .orderByAsc(CompetitionResult::getRanking))
+                .stream().filter(result -> {
+                    if (result.getScheduleId() == null) return true;
+                    Schedule schedule = scheduleService.getById(result.getScheduleId());
+                    return schedule != null && ("FINAL".equalsIgnoreCase(schedule.getRoundType())
+                            || "FIELD_FINAL".equalsIgnoreCase(schedule.getRoundType()));
+                }).collect(Collectors.toList());
     }
 
     @Override
@@ -136,6 +142,17 @@ public class CompetitionResultServiceImpl extends ServiceImpl<CompetitionResultM
     @Transactional(rollbackFor = Exception.class)
     public void saveValidatedResult(CompetitionResult result) {
         if (result == null) throw new BusinessException("成绩数据不能为空");
+        if (result.getId() == null && result.getScheduleId() != null) {
+            LambdaQueryWrapper<CompetitionResult> existingQuery = new LambdaQueryWrapper<CompetitionResult>()
+                    .eq(CompetitionResult::getScheduleId, result.getScheduleId());
+            if (result.getRelayTeamId() != null) {
+                existingQuery.eq(CompetitionResult::getRelayTeamId, result.getRelayTeamId());
+            } else if (result.getRegistrationId() != null) {
+                existingQuery.eq(CompetitionResult::getRegistrationId, result.getRegistrationId());
+            }
+            CompetitionResult existing = this.getOne(existingQuery, false);
+            if (existing != null) result.setId(existing.getId());
+        }
         CompetitionResult before = result.getId() == null ? null : this.getById(result.getId());
         if (result.getId() != null && before == null) throw new BusinessException("成绩记录不存在");
         if (before != null && Objects.equals(before.getIsPublished(), 1)) {
