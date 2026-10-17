@@ -33,6 +33,12 @@
         <el-table-column prop="genderLimitName" label="性别限制" width="100" />
         <el-table-column prop="maxParticipants" label="人数上限" width="100" />
         <el-table-column prop="currentParticipants" label="已报名" width="100" />
+        <el-table-column label="参赛方式" width="100">
+          <template #default="{ row }">{{ row.participationMode === 'RELAY' ? '接力' : '个人' }}</template>
+        </el-table-column>
+        <el-table-column prop="teamMemberCount" label="队员人数" width="100">
+          <template #default="{ row }">{{ row.participationMode === 'RELAY' ? row.teamMemberCount : '—' }}</template>
+        </el-table-column>
         <el-table-column prop="rules" label="比赛规则" min-width="200" show-overflow-tooltip />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -82,8 +88,18 @@
             <el-option label="仅女性" :value="2" />
           </el-select>
         </el-form-item>
-        <el-form-item label="人数上限" prop="maxParticipants">
-          <el-input-number v-model="formData.maxParticipants" :min="1" :max="1000" />
+        <el-form-item label="人数/队伍上限" prop="maxParticipants">
+          <el-input-number v-model="formData.maxParticipants" :min="0" :max="1000" />
+          <span class="form-tip">0表示不限；接力项目按队伍计数。</span>
+        </el-form-item>
+        <el-form-item label="参赛方式" prop="participationMode">
+          <el-select v-model="formData.participationMode" @change="handleParticipationModeChange">
+            <el-option label="个人项目" value="INDIVIDUAL" />
+            <el-option label="接力项目" value="RELAY" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="formData.participationMode === 'RELAY'" label="接力队员人数" prop="teamMemberCount">
+          <el-input-number v-model="formData.teamMemberCount" :min="2" :max="8" />
         </el-form-item>
         <el-form-item label="比赛规则" prop="rules">
           <el-input v-model="formData.rules" type="textarea" :rows="3" placeholder="请输入比赛规则" />
@@ -126,6 +142,8 @@ const formData = reactive({
   type: 'TRACK',
   genderLimit: 0,
   maxParticipants: 100,
+  participationMode: 'INDIVIDUAL',
+  teamMemberCount: null as number | null,
   rules: ''
 })
 
@@ -172,7 +190,8 @@ function handleAdd() {
   dialogTitle.value = '新增项目'
   Object.assign(formData, {
     eventId: null, name: '', type: 'TRACK',
-    genderLimit: 0, maxParticipants: 100, rules: ''
+    genderLimit: 0, maxParticipants: 100, participationMode: 'INDIVIDUAL',
+    teamMemberCount: null, rules: ''
   })
   dialogVisible.value = true
 }
@@ -181,13 +200,28 @@ function handleEdit(row: any) {
   editingId.value = row.id
   dialogTitle.value = '编辑项目'
   Object.assign(formData, row)
+  formData.participationMode = row.participationMode || 'INDIVIDUAL'
+  formData.teamMemberCount = row.teamMemberCount ?? null
   dialogVisible.value = true
+}
+
+function handleParticipationModeChange(mode: string) {
+  if (mode === 'RELAY') {
+    formData.teamMemberCount = formData.teamMemberCount ?? 4
+  } else {
+    formData.teamMemberCount = null
+  }
 }
 
 async function handleSubmit() {
   if (!formRef.value) return
   await formRef.value.validate(async (valid: boolean) => {
     if (!valid) return
+    if (formData.participationMode === 'RELAY'
+      && (!formData.teamMemberCount || formData.teamMemberCount < 2 || formData.teamMemberCount > 8)) {
+      ElMessage.warning('接力项目必须配置2至8名队员')
+      return
+    }
     submitLoading.value = true
     try {
       if (editingId.value) {
@@ -212,3 +246,11 @@ async function handleDelete(row: any) {
   loadData()
 }
 </script>
+
+<style scoped>
+.form-tip {
+  margin-left: 10px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+</style>

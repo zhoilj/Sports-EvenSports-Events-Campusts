@@ -15,6 +15,7 @@
         <el-descriptions-item label="结束日期">{{ eventData.endDate }}</el-descriptions-item>
         <el-descriptions-item label="报名开始">{{ eventData.regStartDate }}</el-descriptions-item>
         <el-descriptions-item label="报名截止">{{ eventData.regEndDate }}</el-descriptions-item>
+        <el-descriptions-item label="每人限报项目数">{{ Number(eventData.maxProjectsPerAthlete ?? 3) === 0 ? '不限' : `${eventData.maxProjectsPerAthlete ?? 3}项` }}</el-descriptions-item>
         <el-descriptions-item label="举办地点">{{ eventData.location }}</el-descriptions-item>
         <el-descriptions-item label="主办单位">{{ eventData.organizer }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ eventData.contactPhone }}</el-descriptions-item>
@@ -37,9 +38,15 @@
       </template>
       <el-table :data="sportItems" border stripe>
         <el-table-column prop="name" label="项目名称" />
-        <el-table-column prop="categoryName" label="类别" width="100" />
-        <el-table-column prop="genderName" label="性别要求" width="100" />
-        <el-table-column prop="maxParticipants" label="人数上限" width="100" />
+        <el-table-column label="类别" width="100">
+          <template #default="{ row }">{{ getItemTypeName(row.type) }}</template>
+        </el-table-column>
+        <el-table-column label="性别要求" width="100">
+          <template #default="{ row }">{{ getGenderLimitName(row.genderLimit) }}</template>
+        </el-table-column>
+        <el-table-column label="人数/队伍上限" width="120">
+          <template #default="{ row }">{{ Number(row.maxParticipants ?? 0) > 0 ? row.maxParticipants : '不限' }}</template>
+        </el-table-column>
         <el-table-column prop="currentParticipants" label="已报名" width="100" />
         <el-table-column label="参赛方式" width="100">
           <template #default="{ row }">{{ row.participationMode === 'RELAY' ? '接力' : '个人' }}</template>
@@ -242,6 +249,23 @@ function getScheduleStatusType(status: string): 'info' | 'primary' | 'success' |
     CANCELLED: 'danger'
   }
   return map[status] || 'info'
+}
+
+function getItemTypeName(type: string) {
+  const map: Record<string, string> = {
+    TRACK: '径赛',
+    FIELD: '田赛',
+    BALL: '球类',
+    SWIMMING: '游泳',
+    WATER: '水上项目',
+    OTHER: '其他'
+  }
+  return map[type] || type || '—'
+}
+
+function getGenderLimitName(limit: number) {
+  const map: Record<number, string> = { 0: '不限', 1: '仅男性', 2: '仅女性' }
+  return map[Number(limit)] || '不限'
 }
 
 function resetRegisterForm() {
