@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -65,10 +66,10 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
 
         // 检查报名时间
         LocalDate today = LocalDate.now();
-        if (today.isBefore(event.getRegStartDate())) {
+        if (event.getRegStartDate() != null && today.isBefore(event.getRegStartDate())) {
             throw new BusinessException(ResultCode.EVENT_REGISTRATION_NOT_STARTED);
         }
-        if (today.isAfter(event.getRegEndDate())) {
+        if (event.getRegEndDate() != null && today.isAfter(event.getRegEndDate())) {
             throw new BusinessException(ResultCode.EVENT_REGISTRATION_ENDED);
         }
 
@@ -79,12 +80,18 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
         }
 
         // 检查人数限制
-        if (sportItem.getMaxParticipants() != null && sportItem.getCurrentParticipants() >= sportItem.getMaxParticipants()) {
+        int currentParticipants = sportItem.getCurrentParticipants() == null ? 0 : sportItem.getCurrentParticipants();
+        // max_participants 为 0 或 null 时表示不限制人数。
+        if (sportItem.getMaxParticipants() != null && sportItem.getMaxParticipants() > 0
+                && currentParticipants >= sportItem.getMaxParticipants()) {
             throw new BusinessException(ResultCode.REGISTRATION_LIMIT_EXCEEDED);
         }
 
         // 检查性别限制 (0-不限 1-仅男 2-仅女)
         SysUser user = sysUserService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ResultCode.REGISTRATION_NOT_ALLOWED, "未找到当前学生信息");
+        }
         Integer genderLimit = sportItem.getGenderLimit();
         if (genderLimit != null && genderLimit != 0) {
             // 用户性别需要与限制匹配
@@ -105,7 +112,7 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
         this.save(registration);
 
         // 更新项目报名人数
-        sportItem.setCurrentParticipants(sportItem.getCurrentParticipants() + 1);
+        sportItem.setCurrentParticipants(currentParticipants + 1);
         sportItemService.updateById(sportItem);
 
         return registration.getId();
@@ -153,8 +160,15 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
             throw new BusinessException("只能审核待审核的报名");
         }
 
-        // 状态转换: APPROVED->2, REJECTED->3
-        Integer statusCode = "APPROVED".equals(status) ? 2 : ("REJECTED".equals(status) ? 3 : registration.getStatus());
+        // 状态转换: APPROVED->2, REJECTED->3。拒绝无效状态，避免静默更新。
+        Integer statusCode;
+        if ("APPROVED".equalsIgnoreCase(status)) {
+            statusCode = 2;
+        } else if ("REJECTED".equalsIgnoreCase(status)) {
+            statusCode = 3;
+        } else {
+            throw new BusinessException("不支持的报名审核状态");
+        }
         registration.setStatus(statusCode);
         registration.setReviewerId(SecurityUtils.getUserId());
         registration.setReviewTime(LocalDateTime.now());
@@ -176,16 +190,28 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
     public IPage<RegistrationVO> pageRegistrations(Integer current, Integer size, Long eventId, Long sportItemId, String status) {
         Page<Registration> page = new Page<>(current, size);
 
+        Integer statusCode = parseStatus(status);
         LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, Registration::getEventId, eventId)
                 .eq(sportItemId != null, Registration::getSportItemId, sportItemId)
-                .eq(status != null, Registration::getStatus, status)
+                .eq(statusCode != null, Registration::getStatus, statusCode)
                 .orderByDesc(Registration::getCreateTime);
 
         IPage<Registration> registrationPage = this.page(page, wrapper);
 
         // 使用批量转换优化N+1查询
         return convertToVOPage(registrationPage);
+    }
+
+    @Override
+    public IPage<RegistrationVO> pageMyRegistrations(Integer current, Integer size, String status) {
+        Page<Registration> page = new Page<>(current, size);
+        Integer statusCode = parseStatus(status);
+        LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Registration::getUserId, SecurityUtils.getUserId())
+                .eq(statusCode != null, Registration::getStatus, statusCode)
+                .orderByDesc(Registration::getCreateTime);
+        return convertToVOPage(this.page(page, wrapper));
     }
 
     @Override
@@ -279,9 +305,34 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
                 }
             }
 
+            vo.setStatus(getStatusCode(registration.getStatus()));
             vo.setStatusName(getStatusName(registration.getStatus()));
             return vo;
         }).collect(Collectors.toList());
+    }
+
+    private Integer parseStatus(String status) {
+        if (!StringUtils.hasText(status)) {
+            return null;
+        }
+        return switch (status.trim().toUpperCase()) {
+            case "PENDING", "1" -> 1;
+            case "APPROVED", "2" -> 2;
+            case "REJECTED", "3" -> 3;
+            case "CANCELLED", "CANCELED", "4" -> 4;
+            default -> throw new BusinessException("不支持的报名状态：" + status);
+        };
+    }
+
+    private String getStatusCode(Integer status) {
+        if (status == null) return "";
+        return switch (status) {
+            case 1 -> "PENDING";
+            case 2 -> "APPROVED";
+            case 3 -> "REJECTED";
+            case 4 -> "CANCELLED";
+            default -> String.valueOf(status);
+        };
     }
 
     private String getStatusName(Integer status) {
