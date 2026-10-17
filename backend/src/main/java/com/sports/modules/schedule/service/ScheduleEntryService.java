@@ -11,6 +11,7 @@ import java.util.List;
 public interface ScheduleEntryService extends IService<ScheduleEntry> {
     int generateEntries(Long scheduleId, Integer groupSize, Integer laneCount);
     List<ScheduleEntryVO> listEntryDetails(Long scheduleId);
+    List<ScheduleEntryVO> listMyEntries(Long userId);
     List<ScheduleConflictVO> checkTimeConflicts(Long scheduleId);
     int advanceEntries(AdvanceEntriesDTO dto);
 }
