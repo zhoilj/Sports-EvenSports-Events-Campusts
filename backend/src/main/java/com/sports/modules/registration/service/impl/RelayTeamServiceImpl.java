@@ -98,7 +98,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         }
 
         List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
-        validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName());
+        validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName(), requiredMemberCount(item));
         roster = arrangeMixedRelayRoster(roster, item);
         ensureMembersAvailable(roster, dto.getEventId(), dto.getSportItemId(), null);
 
@@ -217,7 +217,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         SportItem item = sportItemService.getById(team.getSportItemId());
         validateRelayItem(item, team.getEventId());
         List<Long> roster = normalizeRoster(memberUserIds, team.getCreatorUserId(), item);
-        validateRosterUsers(roster, team.getCollege(), item, team.getClassName());
+        validateRosterUsers(roster, team.getCollege(), item, team.getClassName(), requiredMemberCount(item));
         roster = arrangeMixedRelayRoster(roster, item);
         ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
         memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
@@ -300,7 +300,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         return roster;
     }
 
-    private void validateRosterUsers(List<Long> roster, String college, SportItem item, String captainClass) {
+    private void validateRosterUsers(List<Long> roster, String college, SportItem item, String captainClass, int formalCount) {
         for (Long userId : roster) {
             SysUser user = requireActiveStudent(userId);
             if (!StringUtils.hasText(user.getCollege()) || !user.getCollege().equals(college)) {
@@ -328,6 +328,32 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             if (relay && !mixedRelay && Integer.valueOf(2).equals(item.getGenderLimit())
                     && !Objects.equals(user.getGender(), 2)) {
                 throw new BusinessException("该接力项目仅限女性参赛");
+            }
+        }
+        if (!Integer.valueOf(1).equals(item.getIsRelay())) {
+            List<Long> formalMembers = roster.subList(0, Math.min(formalCount, roster.size()));
+            int maleCount = 0;
+            int femaleCount = 0;
+            for (Long userId : formalMembers) {
+                SysUser user = sysUserService.getById(userId);
+                if (user == null) throw new BusinessException("参赛队员账号不存在");
+                if (Objects.equals(user.getGender(), 1)) maleCount++;
+                else if (Objects.equals(user.getGender(), 2)) femaleCount++;
+            }
+            String rule = item.getTeamRosterRule() == null ? "ANY" : item.getTeamRosterRule();
+            boolean valid = switch (rule) {
+                case "MALE_ONLY" -> maleCount == formalCount;
+                case "FEMALE_ONLY" -> femaleCount == formalCount;
+                case "MIXED_5M5F" -> formalCount == 10 && maleCount == 5 && femaleCount == 5;
+                case "MIXED_10M10F" -> formalCount == 20 && maleCount == 10 && femaleCount == 10;
+                case "MIXED_15M15F" -> formalCount == 30 && maleCount == 15 && femaleCount == 15;
+                case "MIXED_3M3F" -> formalCount == 6 && maleCount == 3 && femaleCount == 3;
+                case "MIXED_6M4F" -> formalCount == 10 && maleCount == 6 && femaleCount == 4;
+                case "MIXED_MIN_6F" -> formalCount == 18 && femaleCount >= 6 && maleCount + femaleCount == formalCount;
+                default -> true;
+            };
+            if (!valid) {
+                throw new BusinessException("参赛队员性别构成不符合项目规程（当前男" + maleCount + "人、女" + femaleCount + "人；规则：" + rule + "）");
             }
         }
     }
