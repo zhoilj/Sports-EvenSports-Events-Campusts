@@ -59,6 +59,7 @@
         <el-table-column label="道次/顺序" width="95">
           <template #default="{ row }">{{ row.laneNo ?? row.startOrder ?? '—' }}</template>
         </el-table-column>
+        <el-table-column label="检录编号" prop="checkinCode" width="125" />
         <el-table-column label="参赛者/队伍" min-width="150">
           <template #default="{ row }">
             <div>{{ row.participantName || row.teamName || '—' }}</div>

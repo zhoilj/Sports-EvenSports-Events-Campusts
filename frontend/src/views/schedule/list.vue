@@ -19,10 +19,10 @@
 
       <!-- 操作按钮 -->
       <div class="mb-10">
-        <el-button type="primary" @click="handleAdd">
+        <el-button v-if="canManageSchedule" type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>新增赛程
         </el-button>
-        <el-button @click="goToOperations">竞赛执行与检录</el-button>
+        <el-button v-if="canOperate" @click="goToOperations">竞赛执行与检录</el-button>
       </div>
 
       <!-- 数据表格 -->
@@ -45,7 +45,7 @@
             <el-tag :type="getStatusType(row.status)">{{ getStatusName(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column v-if="canManageSchedule" label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
             <el-button v-if="row.status === 1" type="success" link @click="handleStart(row)">开始</el-button>
@@ -123,12 +123,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+const canManageSchedule = computed(() => userStore.userInfo?.role === 'ADMIN')
+const canOperate = computed(() => ['ADMIN', 'TEACHER'].includes(userStore.userInfo?.role || ''))
 const loading = ref(false)
 const tableData = ref<any[]>([])
 const total = ref(0)

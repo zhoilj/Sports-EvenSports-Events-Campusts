@@ -15,12 +15,12 @@
         text-color="#bfcbd9"
         active-text-color="#409eff"
       >
-        <template v-for="route in menuRoutes" :key="route.path">
-          <el-menu-item v-if="!route.meta?.hidden" :index="route.path">
+        <el-menu-item-group v-for="group in menuGroups" :key="group.title" :title="isCollapse ? '' : group.title">
+          <el-menu-item v-for="route in group.routes" :key="route.path" :index="menuPath(route.path)">
             <el-icon><component :is="route.meta?.icon" /></el-icon>
             <template #title>{{ route.meta?.title }}</template>
           </el-menu-item>
-        </template>
+        </el-menu-item-group>
       </el-menu>
     </el-aside>
 
@@ -98,6 +98,20 @@ const menuRoutes = computed(() => {
     return userRole && roles.includes(userRole)
   })
 })
+
+const menuGroups = computed(() => {
+  const groups = new Map<string, typeof menuRoutes.value>()
+  menuRoutes.value.forEach(route => {
+    const title = String(route.meta?.group || '其他')
+    if (!groups.has(title)) groups.set(title, [])
+    groups.get(title)!.push(route)
+  })
+  return Array.from(groups.entries()).map(([title, routes]) => ({ title, routes }))
+})
+
+function menuPath(path: string) {
+  return path.startsWith('/') ? path : '/' + path
+}
 
 function toggleCollapse() {
   isCollapse.value = !isCollapse.value
