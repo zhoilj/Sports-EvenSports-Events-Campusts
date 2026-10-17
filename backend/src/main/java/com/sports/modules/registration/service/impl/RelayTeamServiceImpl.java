@@ -304,7 +304,9 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             member.setReserve(i >= formalCount ? 1 : 0);
             members.add(member);
         }
-        memberMapper.insertBatchSomeColumn(members);
+        for (RelayTeamMember member : members) {
+            memberMapper.insert(member);
+        }
     }
 
     private void refreshRelayTeamCount(SportItem item) {
