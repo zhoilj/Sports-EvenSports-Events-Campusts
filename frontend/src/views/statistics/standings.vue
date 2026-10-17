@@ -45,29 +45,29 @@
           <div class="subheading">由管理员配置。正式发布成绩时按名次自动计算积分；同名次选手使用相同名次对应的积分。</div>
         </div>
         <div class="rule-actions">
-          <el-button @click="addRule">添加名次</el-button>
-          <el-button type="primary" :loading="savingRules" @click="saveRules" :disabled="!eventId">保存规则</el-button>
+          <el-button v-if="canEditRules" @click="addRule">添加名次</el-button>
+          <el-button v-if="canEditRules" type="primary" :loading="savingRules" @click="saveRules" :disabled="!eventId">保存规则</el-button>
         </div>
       </div>
       <el-table :data="rules" border>
         <el-table-column label="名次" width="150">
           <template #default="{ row }">
-            <el-input-number v-model="row.placeNo" :min="1" :max="100" />
+            <el-input-number v-model="row.placeNo" :min="1" :max="100" :disabled="!canEditRules" />
           </template>
         </el-table-column>
         <el-table-column label="积分" width="180">
           <template #default="{ row }">
-            <el-input-number v-model="row.points" :min="0" :max="1000" />
+            <el-input-number v-model="row.points" :min="0" :max="1000" :disabled="!canEditRules" />
           </template>
         </el-table-column>
         <el-table-column label="说明">
           <template #default="{ row }">
-            <el-input v-model="row.ruleName" placeholder="例如：第一名积分" />
+            <el-input v-model="row.ruleName" placeholder="例如：第一名积分" :disabled="!canEditRules" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100">
           <template #default="{ $index }">
-            <el-button link type="danger" @click="removeRule($index)">删除</el-button>
+            <el-button v-if="canEditRules" link type="danger" @click="removeRule($index)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -77,10 +77,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { get, put } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
+const canEditRules = computed(() => userStore.userInfo?.role === 'ADMIN')
 const events = ref<any[]>([])
 const eventId = ref<number | null>(null)
 const standings = ref<any[]>([])
