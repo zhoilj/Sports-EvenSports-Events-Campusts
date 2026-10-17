@@ -69,7 +69,7 @@
         <el-table-column label="道次/顺序" width="130">
           <template #default="{ row }">
             <el-input-number
-              v-if="editingPositions && !isField"
+              v-if="editingPositions && !isOrderBased"
               v-model="row.laneNo"
               :min="1"
               :max="16"
@@ -77,7 +77,7 @@
               size="small"
             />
             <el-input-number
-              v-else-if="editingPositions && isField"
+              v-else-if="editingPositions && isOrderBased"
               v-model="row.startOrder"
               :min="1"
               :max="1000"
@@ -134,14 +134,14 @@
 
     <el-dialog v-model="generateDialogVisible" title="生成分组分道名单" width="460px">
       <el-form label-width="130px">
-        <el-form-item label="每组人数">
+        <el-form-item v-if="!isOrderBased" label="每组人数">
           <el-input-number v-model="generateForm.groupSize" :min="1" :max="16" />
         </el-form-item>
-        <el-form-item label="可用道数">
+        <el-form-item v-if="!isOrderBased" label="可用道数">
           <el-input-number v-model="generateForm.laneCount" :min="1" :max="16" />
         </el-form-item>
         <el-alert type="info" :closable="false" show-icon>
-          径赛按组别和道次顺序编排；田赛按检录顺序生成参赛顺序。生成前会检查参赛者在同日其他赛程中的时间冲突。
+          径赛按组别和道次顺序编排；田赛及集体队伍项目按比赛顺序生成参赛名单。生成前会检查参赛者在同日其他赛程中的时间冲突。
         </el-alert>
       </el-form>
       <template #footer>
@@ -242,6 +242,9 @@ const advanceForm = reactive({
 const currentSchedule = computed(() => scheduleOptions.value.find(s => s.id === query.scheduleId))
 const selectedItem = computed(() => sportItemOptions.value.find(i => i.id === currentSchedule.value?.sportItemId))
 const isField = computed(() => selectedItem.value?.type === 'FIELD')
+const isRelay = computed(() => selectedItem.value?.isRelay === 1)
+const isTeamEvent = computed(() => selectedItem.value?.isTeamEvent === 1)
+const isOrderBased = computed(() => isField.value || (isTeamEvent.value && !isRelay.value))
 const isTrack = computed(() => selectedItem.value?.type === 'TRACK' || (selectedItem.value?.isRelay === 1 && selectedItem.value?.type !== 'FIELD'))
 const targetSchedules = computed(() => scheduleOptions.value.filter(s =>
   s.id !== query.scheduleId
@@ -303,14 +306,14 @@ async function savePositions() {
   const positions = entryRows.value.map((row, index) => ({
     entryId: row.id,
     groupNo: String(row.groupNo || '').trim(),
-    laneNo: isField.value ? null : Number(row.laneNo),
+    laneNo: isOrderBased.value ? null : Number(row.laneNo),
     startOrder: Number(row.startOrder || index + 1)
   }))
   if (positions.some(item => !item.groupNo || !Number.isInteger(item.startOrder) || item.startOrder < 1)) {
     ElMessage.warning('请填写有效的组别和比赛顺序')
     return
   }
-  if (!isField.value && positions.some(item => !Number.isInteger(item.laneNo) || Number(item.laneNo) < 1)) {
+  if (!isOrderBased.value && positions.some(item => !Number.isInteger(item.laneNo) || Number(item.laneNo) < 1)) {
     ElMessage.warning('径赛每名参赛者都必须设置有效道次')
     return
   }
@@ -333,7 +336,7 @@ function groupDisplay(value: string | number) {
 
 async function generateEntries() {
   if (!query.scheduleId) return
-  if (!isField.value && generateForm.groupSize > generateForm.laneCount) {
+  if (!isOrderBased.value && generateForm.groupSize > generateForm.laneCount) {
     ElMessage.warning('径赛每组人数不能超过可用道数')
     return
   }
