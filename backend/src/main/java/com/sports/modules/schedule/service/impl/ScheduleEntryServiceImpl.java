@@ -12,6 +12,7 @@ import com.sports.modules.registration.service.RelayTeamService;
 import com.sports.modules.result.entity.CompetitionResult;
 import com.sports.modules.result.service.CompetitionResultService;
 import com.sports.modules.schedule.dto.AdvanceEntriesDTO;
+import com.sports.modules.schedule.dto.ScheduleEntryPositionDTO;
 import com.sports.modules.schedule.entity.CheckinRecord;
 import com.sports.modules.schedule.entity.Schedule;
 import com.sports.modules.schedule.entity.ScheduleEntry;
@@ -34,6 +35,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -151,6 +153,71 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
             checkinRecordMapper.insert(checkin);
         }
         return candidates.size();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int updateEntryPositions(Long scheduleId, List<ScheduleEntryPositionDTO> positions) {
+        Schedule schedule = requireSchedule(scheduleId);
+        if (schedule.getStatus() == null || schedule.getStatus() != 1) {
+            throw new BusinessException("只能调整尚未开始的赛程分组、道次和顺序");
+        }
+        if (positions == null || positions.isEmpty()) {
+            throw new BusinessException("请提交完整的分组分道名单");
+        }
+        List<ScheduleEntry> existingEntries = this.list(new LambdaQueryWrapper<ScheduleEntry>()
+                .eq(ScheduleEntry::getScheduleId, scheduleId));
+        if (positions.size() != existingEntries.size()) {
+            throw new BusinessException("必须一次提交该赛程的全部参赛者，避免出现未保存的分组分道");
+        }
+        Map<Long, ScheduleEntry> entriesById = existingEntries.stream()
+                .collect(Collectors.toMap(ScheduleEntry::getId, entry -> entry));
+        SportItem item = sportItemService.getById(schedule.getSportItemId());
+        boolean field = item != null && "FIELD".equalsIgnoreCase(item.getType());
+        Set<Long> seenIds = new HashSet<>();
+        Set<String> laneKeys = new HashSet<>();
+        Set<String> orderKeys = new HashSet<>();
+        List<ScheduleEntry> toUpdate = new ArrayList<>();
+        for (ScheduleEntryPositionDTO position : positions) {
+            if (position == null || position.getEntryId() == null || !seenIds.add(position.getEntryId())) {
+                throw new BusinessException("参赛名单包含重复或无效的记录");
+            }
+            ScheduleEntry entry = entriesById.get(position.getEntryId());
+            if (entry == null) throw new BusinessException("存在不属于当前赛程的参赛名单记录");
+            String groupNo = position.getGroupNo() == null ? "" : position.getGroupNo().trim();
+            if (groupNo.isBlank()) throw new BusinessException("组别不能为空");
+            if (position.getStartOrder() == null || position.getStartOrder() < 1) {
+                throw new BusinessException("比赛顺序必须为正整数");
+            }
+            if (field) {
+                if (position.getLaneNo() != null) throw new BusinessException("田赛项目使用参赛顺序，不设置道次");
+                if (!orderKeys.add(groupNo + ":" + position.getStartOrder())) {
+                    throw new BusinessException("同一组别的比赛顺序不能重复");
+                }
+                entry.setLaneNo(null);
+            } else {
+                Integer laneNo = position.getLaneNo();
+                if (laneNo == null || laneNo < 1 || laneNo > 16) {
+                    throw new BusinessException("径赛道次必须在1至16之间");
+                }
+                if (!laneKeys.add(groupNo + ":" + laneNo)) {
+                    throw new BusinessException("同一组别的道次不能重复");
+                }
+                entry.setLaneNo(laneNo);
+            }
+            entry.setGroupNo(groupNo);
+            entry.setStartOrder(position.getStartOrder());
+            toUpdate.add(entry);
+        }
+        if (seenIds.size() != existingEntries.size()) {
+            throw new BusinessException("提交的名单未覆盖当前赛程全部参赛者");
+        }
+        for (ScheduleEntry entry : toUpdate) this.updateById(entry);
+        List<ScheduleConflictVO> conflicts = checkTimeConflicts(scheduleId);
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("调整分组分道后发现时间冲突：" + conflicts.get(0).getMessage());
+        }
+        return toUpdate.size();
     }
 
     @Override
