@@ -86,15 +86,21 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             throw new BusinessException(ResultCode.REGISTRATION_LIMIT_EXCEEDED);
         }
 
+        List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
+        validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName(), requiredMemberCount(item));
+        roster = arrangeMixedRelayRoster(roster, item);
+        String teamClassName = resolveTeamClassName(roster, captain.getClassName(), item);
         int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
                 ? 1 : item.getMaxTeamsPerCollege();
         LambdaQueryWrapper<RelayTeam> collegeTeamQuery = new LambdaQueryWrapper<RelayTeam>()
                 .eq(RelayTeam::getEventId, dto.getEventId())
                 .eq(RelayTeam::getSportItemId, dto.getSportItemId())
                 .in(RelayTeam::getStatus, 1, 2);
-        boolean divisionB = "B".equalsIgnoreCase(item.getDivision());
-        if (divisionB && StringUtils.hasText(captain.getClassName())) {
-            collegeTeamQuery.eq(RelayTeam::getClassName, captain.getClassName());
+        boolean divisionB = "B".equalsIgnoreCase(item.getDivision())
+                || (Integer.valueOf(1).equals(item.getIsTeamEvent())
+                && !Integer.valueOf(1).equals(item.getIsRelay()) && isSportsClassName(teamClassName));
+        if (divisionB && StringUtils.hasText(teamClassName)) {
+            collegeTeamQuery.eq(RelayTeam::getClassName, teamClassName);
         } else {
             collegeTeamQuery.eq(RelayTeam::getCollege, captain.getCollege());
         }
@@ -103,10 +109,6 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             throw new BusinessException("该项目每个" + (divisionB ? "年级/专业班级" : "学院")
                     + "最多可报名" + maxPerCollege + "支队伍");
         }
-
-        List<Long> roster = normalizeRoster(dto.getMemberUserIds(), currentUserId, item);
-        validateRosterUsers(roster, captain.getCollege(), item, captain.getClassName(), requiredMemberCount(item));
-        roster = arrangeMixedRelayRoster(roster, item);
         ensureMembersAvailable(roster, dto.getEventId(), dto.getSportItemId(), null);
 
         RelayTeam team = new RelayTeam();
@@ -114,7 +116,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         team.setSportItemId(dto.getSportItemId());
         team.setTeamName(dto.getTeamName().trim());
         team.setCollege(captain.getCollege());
-        team.setClassName(captain.getClassName());
+        team.setClassName(teamClassName);
         team.setCreatorUserId(currentUserId);
         team.setStatus(1);
         this.save(team);
@@ -226,6 +228,7 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         List<Long> roster = normalizeRoster(memberUserIds, team.getCreatorUserId(), item);
         validateRosterUsers(roster, team.getCollege(), item, team.getClassName(), requiredMemberCount(item));
         roster = arrangeMixedRelayRoster(roster, item);
+        team.setClassName(resolveTeamClassName(roster, team.getClassName(), item));
         ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
         memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
         saveRoster(id, roster, requiredMemberCount(item));
@@ -313,7 +316,9 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             if (!StringUtils.hasText(user.getCollege()) || !user.getCollege().equals(college)) {
                 throw new BusinessException("接力队员必须来自队伍所属学院");
             }
-            if ("B".equalsIgnoreCase(item.getDivision()) && StringUtils.hasText(captainClass)
+            boolean genericTeam = Integer.valueOf(1).equals(item.getIsTeamEvent())
+                    && !Integer.valueOf(1).equals(item.getIsRelay());
+            if (!genericTeam && "B".equalsIgnoreCase(item.getDivision()) && StringUtils.hasText(captainClass)
                     && !captainClass.equals(user.getClassName())) {
                 throw new BusinessException("乙组接力队员必须来自同一年级/专业班级，团体积分按班级归属统计");
             }
@@ -335,6 +340,23 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
             if (relay && !mixedRelay && Integer.valueOf(2).equals(item.getGenderLimit())
                     && !Objects.equals(user.getGender(), 2)) {
                 throw new BusinessException("该接力项目仅限女性参赛");
+            }
+        }
+        boolean genericTeam = Integer.valueOf(1).equals(item.getIsTeamEvent())
+                && !Integer.valueOf(1).equals(item.getIsRelay());
+        if (genericTeam) {
+            Set<String> sportsClasses = roster.stream()
+                    .map(sysUserService::getById)
+                    .filter(Objects::nonNull)
+                    .map(SysUser::getClassName)
+                    .filter(StringUtils::hasText)
+                    .filter(this::isSportsClassName)
+                    .collect(Collectors.toSet());
+            if (sportsClasses.size() > 1) {
+                throw new BusinessException("乙组团队成员只能归属一个体育专业年级/班级");
+            }
+            if ("B".equalsIgnoreCase(item.getDivision()) && sportsClasses.isEmpty()) {
+                throw new BusinessException("乙组团队至少需要一名体育专业类学生，混合甲乙组队伍按乙组归属");
             }
         }
         if (!Integer.valueOf(1).equals(item.getIsRelay())) {
@@ -443,6 +465,24 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
                 throw new BusinessException("队员已参加该项目的其他待审或已通过队伍");
             }
         }
+    }
+
+    private String resolveTeamClassName(List<Long> roster, String fallbackClass, SportItem item) {
+        if (item == null || !Integer.valueOf(1).equals(item.getIsTeamEvent())
+                || Integer.valueOf(1).equals(item.getIsRelay())) return fallbackClass;
+        Set<String> sportsClasses = roster.stream()
+                .map(sysUserService::getById)
+                .filter(Objects::nonNull)
+                .map(SysUser::getClassName)
+                .filter(StringUtils::hasText)
+                .filter(this::isSportsClassName)
+                .collect(Collectors.toSet());
+        return sportsClasses.isEmpty() ? fallbackClass : sportsClasses.iterator().next();
+    }
+
+    private boolean isSportsClassName(String className) {
+        if (!StringUtils.hasText(className)) return false;
+        return className.matches(".*(社体|体教|体育教育|社会体育|运动训练|休闲体育|体育保健).*");
     }
 
     private int requiredMemberCount(SportItem item) {
