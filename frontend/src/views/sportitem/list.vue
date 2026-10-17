@@ -247,7 +247,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
 
