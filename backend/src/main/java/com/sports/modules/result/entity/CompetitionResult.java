@@ -78,6 +78,10 @@ public class CompetitionResult extends BaseEntity {
     @TableField("result_status")
     private String resultStatus;
 
+    /** 1 when the result breaks an officially recognized meet record. */
+    @TableField("is_record")
+    private Integer isRecord;
+
     /**
      * 排名
      */
