@@ -60,6 +60,7 @@ public class ScheduleController {
     public Result<Long> create(@Valid @RequestBody Schedule schedule) {
         // 设置默认状态和轮次类型。
         if (schedule.getStatus() == null) schedule.setStatus(1);
+        if (schedule.getRoundNo() == null) schedule.setRoundNo(1);
         if (schedule.getRoundType() == null) schedule.setRoundType("FINAL");
         scheduleService.validateSchedule(schedule, null);
         scheduleService.save(schedule);
@@ -77,6 +78,13 @@ public class ScheduleController {
         }
         schedule.setId(id);
         if (schedule.getRoundType() == null) schedule.setRoundType(existing.getRoundType() == null ? "FINAL" : existing.getRoundType());
+        long entryCount = scheduleEntryService.count(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.sports.modules.schedule.entity.ScheduleEntry>()
+                .eq(com.sports.modules.schedule.entity.ScheduleEntry::getScheduleId, id));
+        if (entryCount > 0 && (!java.util.Objects.equals(existing.getEventId(), schedule.getEventId())
+                || !java.util.Objects.equals(existing.getSportItemId(), schedule.getSportItemId())
+                || !java.util.Objects.equals(existing.getRoundType(), schedule.getRoundType()))) {
+            throw new BusinessException("赛程已生成参赛名单，不能更换赛事、项目或轮次类型");
+        }
         scheduleService.validateSchedule(schedule, id);
         scheduleService.updateById(schedule);
         java.util.List<ScheduleConflictVO> conflicts = scheduleEntryService.checkTimeConflicts(id);
@@ -93,6 +101,11 @@ public class ScheduleController {
         Schedule existing = scheduleService.getById(id);
         if (existing == null) {
             throw new BusinessException(ResultCode.SCHEDULE_NOT_FOUND);
+        }
+        long entryCount = scheduleEntryService.count(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.sports.modules.schedule.entity.ScheduleEntry>()
+                .eq(com.sports.modules.schedule.entity.ScheduleEntry::getScheduleId, id));
+        if (entryCount > 0) {
+            throw new BusinessException("赛程已生成参赛名单，不能直接删除；请先处理参赛名单");
         }
         scheduleService.removeById(id);
         return Result.success();
