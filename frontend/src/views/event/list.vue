@@ -54,9 +54,9 @@
           <template #default="{ row }">
             <el-button type="primary" link @click="handleView(row)">查看</el-button>
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="row.status === 'DRAFT'" type="success" link @click="handlePublish(row)">发布</el-button>
-            <el-button v-if="row.status !== 'ENDED' && row.status !== 'CANCELLED'" type="danger" link @click="handleCancel(row)">取消</el-button>
-            <el-button v-if="row.status === 'DRAFT' || row.status === 'CANCELLED'" type="danger" link @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="row.status === 1" type="success" link @click="handlePublish(row)">发布</el-button>
+            <el-button v-if="row.status === 2 || row.status === 3" type="danger" link @click="handleCancel(row)">取消</el-button>
+            <el-button v-if="row.status === 1" type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -194,13 +194,12 @@ function resetQuery() {
   loadData()
 }
 
-function getStatusType(status: string) {
-  const map: Record<string, string> = {
-    DRAFT: 'info',
-    PUBLISHED: 'primary',
-    ONGOING: 'success',
-    ENDED: 'warning',
-    CANCELLED: 'danger'
+function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
+  const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
+    1: 'info',
+    2: 'primary',
+    3: 'success',
+    4: 'warning'
   }
   return map[status] || 'info'
 }
