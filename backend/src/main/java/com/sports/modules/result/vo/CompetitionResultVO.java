@@ -39,6 +39,8 @@ public class CompetitionResultVO {
      * 用户ID
      */
     private Long userId;
+
+    private Long registrationId;
     
     /**
      * 用户名
@@ -69,6 +71,8 @@ public class CompetitionResultVO {
      * 成绩单位
      */
     private String unit;
+
+    private String scoreText;
     
     /**
      * 名次
