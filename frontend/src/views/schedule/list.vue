@@ -22,6 +22,7 @@
         <el-button type="primary" @click="handleAdd">
           <el-icon><Plus /></el-icon>新增赛程
         </el-button>
+        <el-button @click="goToOperations">竞赛执行与检录</el-button>
       </div>
 
       <!-- 数据表格 -->
@@ -31,6 +32,9 @@
         <el-table-column prop="sportItemName" label="运动项目" width="120" />
         <el-table-column prop="scheduleName" label="赛程名称" width="100" />
         <el-table-column prop="roundNo" label="轮次" width="80" />
+        <el-table-column prop="roundType" label="轮次类型" width="110">
+          <template #default="{ row }">{{ roundTypeName(row.roundType) }}</template>
+        </el-table-column>
         <el-table-column prop="groupNo" label="分组" width="80" />
         <el-table-column prop="matchDate" label="比赛日期" width="120" />
         <el-table-column prop="startTime" label="开始时间" width="100" />
@@ -83,6 +87,14 @@
         <el-form-item label="轮次" prop="roundNo">
           <el-input-number v-model="formData.roundNo" :min="1" :max="10" />
         </el-form-item>
+        <el-form-item label="轮次类型" prop="roundType">
+          <el-select v-model="formData.roundType" placeholder="请选择轮次类型">
+            <el-option label="预赛" value="PRELIMINARY" />
+            <el-option label="半决赛" value="SEMIFINAL" />
+            <el-option label="决赛" value="FINAL" />
+            <el-option label="田赛决赛" value="FIELD_FINAL" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="分组" prop="groupNo">
           <el-input v-model="formData.groupNo" placeholder="如：A组、B组" />
         </el-form-item>
@@ -114,7 +126,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, FormInstance, FormRules } from 'element-plus'
 import { get, post, put, del } from '@/utils/request'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const loading = ref(false)
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -139,6 +153,7 @@ const formData = reactive({
   sportItemId: null as number | null,
   scheduleName: '',
   roundNo: 1,
+  roundType: 'FINAL',
   groupNo: '',
   matchDate: '',
   startTime: '',
@@ -198,6 +213,15 @@ function resetQuery() {
   loadData()
 }
 
+function goToOperations() {
+  router.push('/competition-operations')
+}
+
+function roundTypeName(type: string) {
+  const map: Record<string, string> = { PRELIMINARY: '预赛', SEMIFINAL: '半决赛', FINAL: '决赛', FIELD_FINAL: '田赛决赛' }
+  return map[type] || type || '决赛'
+}
+
 function getStatusType(status: number): 'success' | 'warning' | 'info' | 'primary' | 'danger' {
   const map: Record<number, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     1: 'info',      // 未开始
@@ -222,7 +246,7 @@ function handleAdd() {
   editingId.value = null
   dialogTitle.value = '新增赛程'
   Object.assign(formData, {
-    eventId: null, sportItemId: null, scheduleName: '', roundNo: 1,
+    eventId: null, sportItemId: null, scheduleName: '', roundNo: 1, roundType: 'FINAL',
     groupNo: '', matchDate: '', startTime: '', endTime: '', location: '', remark: ''
   })
   sportItemOptions.value = []
