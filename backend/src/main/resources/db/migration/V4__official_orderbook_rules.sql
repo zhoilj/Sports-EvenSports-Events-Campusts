@@ -37,3 +37,61 @@ PREPARE sports_stmt FROM @sql; EXECUTE sports_stmt; DEALLOCATE PREPARE sports_st
 SET @sql = IF(EXISTS(SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=@sports_db AND TABLE_NAME='result' AND COLUMN_NAME='is_record'),
   'SELECT 1', 'ALTER TABLE result ADD COLUMN is_record TINYINT NOT NULL DEFAULT 0 COMMENT ''1 if the result breaks a recognized meet record'' AFTER result_status');
 PREPARE sports_stmt FROM @sql; EXECUTE sports_stmt; DEALLOCATE PREPARE sports_stmt;
+
+-- Best-effort migration of existing item definitions. Administrators should verify
+-- every item against the official order book before opening the competition.
+UPDATE sport_item
+SET division = CASE
+  WHEN item_name LIKE '%甲组%' THEN 'A'
+  WHEN item_name LIKE '%乙组%' THEN 'B'
+  WHEN item_name LIKE '%教工组%' THEN 'STAFF'
+  WHEN item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
+    OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
+    OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%背篓接绣球%'
+    OR item_name LIKE '%校园越野跑%' OR item_name LIKE '%车轮滚滚%' OR item_name LIKE '%旱地龙舟%'
+    OR item_name LIKE '%袋鼠跳%' OR item_name LIKE '%滚铁环%' OR item_name LIKE '%企鹅漫步%'
+    OR item_name LIKE '%协同大转盘%' THEN 'A'
+  ELSE division
+END
+WHERE division = 'OPEN';
+
+UPDATE sport_item
+SET gender_category = CASE
+  WHEN item_name LIKE '%混合接力%' OR item_name LIKE '%混合%' THEN 'MIXED'
+  WHEN item_name LIKE '%男子%' THEN 'MALE'
+  WHEN item_name LIKE '%女子%' THEN 'FEMALE'
+  WHEN gender_limit = 1 THEN 'MALE'
+  WHEN gender_limit = 2 THEN 'FEMALE'
+  ELSE 'OPEN'
+END
+WHERE gender_category = 'OPEN';
+
+UPDATE sport_item
+SET round_policy = CASE
+  WHEN item_name LIKE '%混合接力%' OR item_type = 'FIELD' THEN 'FINAL_ONLY'
+  WHEN item_name LIKE '%100米%' OR item_name LIKE '%200米%'
+    OR item_name LIKE '%4×100%' OR item_name LIKE '%4x100%' OR item_name LIKE '%4X100%' THEN 'PRELIMINARY_FINAL'
+  ELSE 'FINAL_ONLY'
+END
+WHERE round_policy = 'FLEXIBLE';
+
+UPDATE sport_item
+SET scoring_multiplier = 2
+WHERE is_relay = 1
+   OR item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
+   OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
+   OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%背篓接绣球%'
+   OR item_name LIKE '%校园越野跑%' OR item_name LIKE '%车轮滚滚%' OR item_name LIKE '%旱地龙舟%'
+   OR item_name LIKE '%袋鼠跳%' OR item_name LIKE '%滚铁环%' OR item_name LIKE '%企鹅漫步%'
+   OR item_name LIKE '%协同大转盘%';
+
+UPDATE sport_item
+SET participation_points = 3
+WHERE item_name LIKE '%集体%' OR item_name LIKE '%民体%' OR item_name LIKE '%趣味%'
+   OR item_name LIKE '%拔河%' OR item_name LIKE '%跳长绳%' OR item_name LIKE '%两人三足%'
+   OR item_name LIKE '%三人板鞋%' OR item_name LIKE '%抛绣球%' OR item_name LIKE '%背篓接绣球%'
+   OR item_name LIKE '%校园越野跑%' OR item_name LIKE '%车轮滚滚%' OR item_name LIKE '%旱地龙舟%'
+   OR item_name LIKE '%袋鼠跳%' OR item_name LIKE '%滚铁环%' OR item_name LIKE '%企鹅漫步%'
+   OR item_name LIKE '%协同大转盘%';
+
+UPDATE sport_item SET record_points = 9 WHERE record_points IS NULL OR record_points < 0;
