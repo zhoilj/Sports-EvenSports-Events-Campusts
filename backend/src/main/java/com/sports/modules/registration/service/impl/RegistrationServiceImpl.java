@@ -10,7 +10,11 @@ import com.sports.modules.event.entity.Event;
 import com.sports.modules.event.service.EventService;
 import com.sports.modules.registration.dto.RegistrationDTO;
 import com.sports.modules.registration.entity.Registration;
+import com.sports.modules.registration.entity.RegistrationStatus;
+import com.sports.modules.registration.entity.RegistrationMember;
 import com.sports.modules.registration.mapper.RegistrationMapper;
+import com.sports.modules.registration.mapper.RegistrationMemberMapper;
+import com.sports.modules.registration.vo.RegistrationMemberVO;
 import com.sports.modules.registration.service.RegistrationService;
 import com.sports.modules.registration.vo.RegistrationVO;
 import com.sports.modules.sportitem.entity.SportItem;
@@ -42,6 +46,7 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
     private final EventService eventService;
     private final SportItemService sportItemService;
     private final SysUserService sysUserService;
+    private final RegistrationMemberMapper registrationMemberMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -178,9 +183,13 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
 
         LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(eventId != null, Registration::getEventId, eventId)
-                .eq(sportItemId != null, Registration::getSportItemId, sportItemId)
-                .eq(status != null, Registration::getStatus, status)
-                .orderByDesc(Registration::getCreateTime);
+                .eq(sportItemId != null, Registration::getSportItemId, sportItemId);
+        if (status != null && !status.isBlank()) {
+            RegistrationStatus parsed = RegistrationStatus.fromApi(status);
+            if (parsed == null) throw new BusinessException("报名状态筛选值无效");
+            wrapper.eq(Registration::getStatus, parsed.getCode());
+        }
+        wrapper.orderByDesc(Registration::getCreateTime);
 
         IPage<Registration> registrationPage = this.page(page, wrapper);
 
@@ -189,15 +198,61 @@ public class RegistrationServiceImpl extends ServiceImpl<RegistrationMapper, Reg
     }
 
     @Override
-    public List<RegistrationVO> getMyRegistrations() {
+    public IPage<RegistrationVO> getMyRegistrations(Integer current, Integer size, String status) {
         Long userId = SecurityUtils.getUserId();
+        List<RegistrationMember> memberships = registrationMemberMapper.selectList(
+                new LambdaQueryWrapper<RegistrationMember>().eq(RegistrationMember::getUserId, userId));
+        Set<Long> memberRegistrationIds = memberships.stream().map(RegistrationMember::getRegistrationId).collect(Collectors.toSet());
 
+        Page<Registration> page = new Page<>(current, size);
         LambdaQueryWrapper<Registration> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Registration::getUserId, userId)
-                .orderByDesc(Registration::getCreateTime);
+        if (memberRegistrationIds.isEmpty()) {
+            wrapper.eq(Registration::getUserId, userId);
+        } else {
+            wrapper.and(q -> q.eq(Registration::getUserId, userId).or().in(Registration::getId, memberRegistrationIds));
+        }
+        if (status != null && !status.isBlank()) {
+            RegistrationStatus parsed = RegistrationStatus.fromApi(status);
+            if (parsed == null) throw new BusinessException("报名状态筛选值无效");
+            wrapper.eq(Registration::getStatus, parsed.getCode());
+        }
+        wrapper.orderByDesc(Registration::getCreateTime);
+        IPage<Registration> result = this.page(page, wrapper);
+        return result.convert(registration -> {
+            RegistrationVO vo = new RegistrationVO();
+            BeanUtils.copyProperties(registration, vo);
+            vo.setStatus(RegistrationStatus.fromCode(registration.getStatus()) == null ? "" : RegistrationStatus.fromCode(registration.getStatus()).name());
+            vo.setStatusName(getStatusName(registration.getStatus()));
+            return vo;
+        });
+    }
 
-        List<Registration> registrations = this.list(wrapper);
-        return convertToVOList(registrations);
+    @Override
+    public List<RegistrationMemberVO> listEligibleAthletes(String keyword) {
+        SysUser current = sysUserService.getById(SecurityUtils.getUserId());
+        if (current == null || !"STUDENT".equals(current.getRole()) || !Integer.valueOf(1).equals(current.getStatus())) {
+            throw new BusinessException("仅正常状态的学生可以查询接力队员");
+        }
+        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getRole, "STUDENT")
+                .eq(SysUser::getStatus, 1);
+        if (current.getCollegeId() != null) wrapper.eq(SysUser::getCollegeId, current.getCollegeId());
+        else if (current.getCollege() != null && !current.getCollege().isBlank()) wrapper.eq(SysUser::getCollege, current.getCollege());
+        else throw new BusinessException("请先完善学院信息");
+        if (keyword != null && !keyword.isBlank()) {
+            String k = keyword.trim();
+            wrapper.and(q -> q.like(SysUser::getRealName, k).or().like(SysUser::getStudentNo, k));
+        }
+        wrapper.orderByAsc(SysUser::getRealName).last("LIMIT 50");
+        return sysUserService.list(wrapper).stream().map(user -> {
+            RegistrationMemberVO vo = new RegistrationMemberVO();
+            vo.setUserId(user.getId());
+            vo.setRealName(user.getRealName());
+            vo.setStudentNo(user.getStudentNo());
+            vo.setCollege(user.getCollege());
+            vo.setClassName(user.getClassName());
+            return vo;
+        }).collect(Collectors.toList());
     }
 
     @Override
