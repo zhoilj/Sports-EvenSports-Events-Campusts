@@ -3,6 +3,7 @@ package com.sports.modules.result.controller;
 import com.sports.common.result.PageResult;
 import com.sports.common.result.Result;
 import com.sports.modules.result.entity.CompetitionResult;
+import com.sports.modules.result.dto.ReviewResultDTO;
 import com.sports.modules.result.service.CompetitionResultService;
 import com.sports.modules.result.vo.CompetitionResultVO;
 import com.sports.security.util.SecurityUtils;
@@ -77,11 +78,27 @@ public class CompetitionResultController {
         return Result.success();
     }
 
+    @Operation(summary = "复核成绩")
+    @PostMapping("/{id}/review")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEACHER')")
+    public Result<Void> reviewResult(@PathVariable Long id, @Valid @RequestBody ReviewResultDTO dto) {
+        competitionResultService.reviewResult(id, dto.getStatus(), dto.getRemark());
+        return Result.success();
+    }
+
+    @Operation(summary = "正式发布赛程成绩")
+    @PostMapping("/schedules/{scheduleId}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Result<Integer> publishScheduleResults(@PathVariable Long scheduleId) {
+        int count = competitionResultService.publishScheduleResults(scheduleId);
+        return Result.success("已正式发布 " + count + " 条成绩", count);
+    }
+
     @Operation(summary = "删除成绩")
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public Result<Void> deleteResult(@PathVariable Long id) {
-        competitionResultService.removeById(id);
+        competitionResultService.deleteResult(id);
         return Result.success();
     }
 }
