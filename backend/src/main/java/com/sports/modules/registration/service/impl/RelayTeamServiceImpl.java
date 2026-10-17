@@ -426,7 +426,11 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         Event event = eventService.getById(team.getEventId());
         if (event != null) vo.setEventName(event.getName());
         SportItem item = sportItemService.getById(team.getSportItemId());
-        if (item != null) vo.setSportItemName(item.getName());
+        if (item != null) {
+            vo.setSportItemName(item.getName());
+            vo.setIsRelay(item.getIsRelay());
+            vo.setIsTeamEvent(item.getIsTeamEvent());
+        }
         SysUser creator = sysUserService.getById(team.getCreatorUserId());
         if (creator != null) vo.setCreatorName(creator.getRealName());
         if (team.getReviewerId() != null) {
