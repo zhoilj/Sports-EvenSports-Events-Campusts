@@ -290,18 +290,30 @@ public class ScheduleEntryServiceImpl extends ServiceImpl<ScheduleEntryMapper, S
         if (topPerGroup > 0) {
             for (List<CompetitionResult> groupResults : byGroup.values()) {
                 groupResults.sort(scoreOrder);
-                for (int i = 0; i < Math.min(topPerGroup, groupResults.size()); i++) {
+                int guaranteed = Math.min(topPerGroup, groupResults.size());
+                BigDecimal cutoff = groupResults.get(guaranteed - 1).getScore();
+                for (int i = 0; i < groupResults.size(); i++) {
                     CompetitionResult result = groupResults.get(i);
-                    if (selectedKeys.add(resultKey(result))) selected.add(result);
+                    if (i < guaranteed || result.getScore().compareTo(cutoff) == 0) {
+                        if (selectedKeys.add(resultKey(result))) selected.add(result);
+                    }
                 }
             }
         }
         if (selected.size() > qualifyCount) {
-            throw new BusinessException("各组保送晋级人数已超过总晋级人数，请调整规则");
+            throw new BusinessException("各组直接晋级名额及并列成绩已超过总晋级人数，请调整晋级规则");
         }
         for (CompetitionResult result : eligible) {
             if (selected.size() >= qualifyCount) break;
             if (selectedKeys.add(resultKey(result))) selected.add(result);
+        }
+        if (selected.size() >= qualifyCount && selected.size() < eligible.size()) {
+            BigDecimal cutoff = selected.get(selected.size() - 1).getScore();
+            for (CompetitionResult result : eligible) {
+                if (result.getScore().compareTo(cutoff) == 0 && selectedKeys.add(resultKey(result))) {
+                    selected.add(result);
+                }
+            }
         }
         if (selected.isEmpty()) throw new BusinessException("没有符合条件的晋级选手");
 
