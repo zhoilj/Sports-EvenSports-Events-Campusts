@@ -35,7 +35,7 @@
 
       <el-alert v-if="currentSchedule" type="info" :closable="false" show-icon class="mb-16">
         <template #title>
-          {{ currentSchedule.sportItemName }} · {{ roundName(currentSchedule.roundType) }} ·
+          {{ currentSchedule.sportItemName }} · {{ groupName(currentSchedule.competitionGroup) }} · {{ roundName(currentSchedule.roundType) }} ·
           {{ currentSchedule.matchDate }} {{ currentSchedule.startTime }}–{{ currentSchedule.endTime || '约60分钟' }} ·
           {{ currentSchedule.location || '未设置场地' }}
         </template>
@@ -55,6 +55,7 @@
       </div>
 
       <el-table :data="entryRows" v-loading="loading" border stripe>
+        <el-table-column label="竞赛组别" width="155"><template #default="{ row }">{{ groupName(row.competitionGroup) }}</template></el-table-column>
         <el-table-column label="组别" prop="groupNo" width="75" />
         <el-table-column label="道次/顺序" width="95">
           <template #default="{ row }">{{ row.laneNo ?? row.startOrder ?? '—' }}</template>
@@ -425,6 +426,12 @@ function downloadCsv(content: string, filename: string) {
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+}
+
+function groupName(group: string) {
+  if (group === 'A') return '甲组 · 普通本科组'
+  if (group === 'B') return '乙组 · 体育专业组'
+  return '待核定'
 }
 
 function roundName(type: string) {
