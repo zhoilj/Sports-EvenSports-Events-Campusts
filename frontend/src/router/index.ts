@@ -71,6 +71,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/schedule/list.vue'),
         meta: { title: '赛程安排', icon: 'Calendar' }
       },
+      {
+        path: 'schedule-execution',
+        name: 'ScheduleExecution',
+        component: () => import('@/views/schedule/execution.vue'),
+        meta: { title: '竞赛编排与检录', icon: 'Timer', roles: ['ADMIN', 'TEACHER'] }
+      },
+      {
+        path: 'my-schedule-entries',
+        name: 'MyScheduleEntries',
+        component: () => import('@/views/schedule/my-entries.vue'),
+        meta: { title: '我的检录编号', icon: 'Tickets', roles: ['STUDENT'] }
+      },
       // 成绩管理
       {
         path: 'results',
