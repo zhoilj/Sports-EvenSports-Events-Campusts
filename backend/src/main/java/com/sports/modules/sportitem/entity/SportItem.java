@@ -68,6 +68,29 @@ public class SportItem extends BaseEntity {
     @TableField("gender_limit")
     private Integer genderLimit;
 
+    /** 甲组/乙组/教工组/不分组：A/B/STAFF/OPEN。 */
+    private String division;
+
+    /** MALE/FEMALE/MIXED/OPEN. */
+    @TableField("gender_category")
+    private String genderCategory;
+
+    /** FINAL_ONLY/PRELIMINARY_FINAL/FLEXIBLE. */
+    @TableField("round_policy")
+    private String roundPolicy;
+
+    /** Official scoring multiplier, e.g. 2 for relay and group events. */
+    @TableField("scoring_multiplier")
+    private Integer scoringMultiplier;
+
+    /** Optional participation points for an eligible checked-in result. */
+    @TableField("participation_points")
+    private Integer participationPoints;
+
+    /** Base points for a record-breaking result before multiplier. */
+    @TableField("record_points")
+    private Integer recordPoints;
+
     /**
      * 最大报名人数
      */
