@@ -229,6 +229,25 @@ public class RelayTeamServiceImpl extends ServiceImpl<RelayTeamMapper, RelayTeam
         validateRosterUsers(roster, team.getCollege(), item, team.getClassName(), requiredMemberCount(item));
         roster = arrangeMixedRelayRoster(roster, item);
         team.setClassName(resolveTeamClassName(roster, team.getClassName(), item));
+        int maxPerCollege = item.getMaxTeamsPerCollege() == null || item.getMaxTeamsPerCollege() < 1
+                ? 1 : item.getMaxTeamsPerCollege();
+        boolean divisionB = "B".equalsIgnoreCase(item.getDivision())
+                || (Integer.valueOf(1).equals(item.getIsTeamEvent())
+                && !Integer.valueOf(1).equals(item.getIsRelay()) && isSportsClassName(team.getClassName()));
+        LambdaQueryWrapper<RelayTeam> teamLimitQuery = new LambdaQueryWrapper<RelayTeam>()
+                .eq(RelayTeam::getEventId, team.getEventId())
+                .eq(RelayTeam::getSportItemId, team.getSportItemId())
+                .ne(RelayTeam::getId, team.getId())
+                .in(RelayTeam::getStatus, 1, 2);
+        if (divisionB && StringUtils.hasText(team.getClassName())) {
+            teamLimitQuery.eq(RelayTeam::getClassName, team.getClassName());
+        } else {
+            teamLimitQuery.eq(RelayTeam::getCollege, team.getCollege());
+        }
+        if (this.count(teamLimitQuery) >= maxPerCollege) {
+            throw new BusinessException("调整队员后会超过该项目每个"
+                    + (divisionB ? "年级/专业班级" : "学院") + "的队伍数量限制");
+        }
         this.updateById(team);
         ensureMembersAvailable(roster, team.getEventId(), team.getSportItemId(), team.getId());
         memberMapper.delete(new LambdaQueryWrapper<RelayTeamMember>().eq(RelayTeamMember::getTeamId, id));
