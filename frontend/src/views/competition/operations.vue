@@ -87,7 +87,7 @@
         <el-table-column label="检录操作" width="245" fixed="right">
           <template #default="{ row }">
             <el-button link type="success" :disabled="!canCheckin(row)" @click="setCheckin(row, 'CHECKED_IN')">已检录</el-button>
-            <el-dropdown :disabled="!canCheckin(row)" @command="(status: string) => setCheckin(row, status)">
+            <el-dropdown :disabled="!canCheckin(row)" @command="status => setCheckin(row, status)">
               <el-button link type="warning" :disabled="!canCheckin(row)">异常状态<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
               <template #dropdown>
                 <el-dropdown-menu>
