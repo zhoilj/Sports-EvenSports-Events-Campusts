@@ -4,7 +4,7 @@
     <el-aside :width="isCollapse ? '64px' : '220px'" class="layout-aside">
       <div class="logo">
         <img src="@/assets/logo.svg" alt="logo" class="logo-img" />
-        <span v-show="!isCollapse" class="logo-text">体育赛事管理</span>
+        <span v-show="!isCollapse" class="logo-text">校园运动会管理</span>
       </div>
       <el-menu
         :default-active="activeMenu"
@@ -15,11 +15,31 @@
         text-color="#bfcbd9"
         active-text-color="#409eff"
       >
-        <template v-for="route in menuRoutes" :key="route.path">
-          <el-menu-item v-if="!route.meta?.hidden" :index="route.path">
-            <el-icon><component :is="route.meta?.icon" /></el-icon>
-            <template #title>{{ route.meta?.title }}</template>
+        <template v-for="group in menuGroups" :key="group.name || group.routes[0].path">
+          <el-menu-item
+            v-if="group.routes.length === 1"
+            :index="getMenuPath(group.routes[0])"
+          >
+            <el-icon>
+              <component :is="group.routes[0].meta?.icon || 'Menu'" />
+            </el-icon>
+            <template #title>{{ group.routes[0].meta?.title }}</template>
           </el-menu-item>
+
+          <el-sub-menu v-else :index="'group-' + group.name">
+            <template #title>
+              <el-icon><component :is="group.icon" /></el-icon>
+              <span>{{ group.name }}</span>
+            </template>
+            <el-menu-item
+              v-for="item in group.routes"
+              :key="item.path"
+              :index="getMenuPath(item)"
+            >
+              <el-icon><component :is="item.meta?.icon || 'Menu'" /></el-icon>
+              <template #title>{{ item.meta?.title }}</template>
+            </el-menu-item>
+          </el-sub-menu>
         </template>
       </el-menu>
     </el-aside>
@@ -33,7 +53,7 @@
             <Expand v-else />
           </el-icon>
           <el-breadcrumb separator="/">
-            <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item :to="{ path: '/' }">赛事工作台</el-breadcrumb-item>
             <el-breadcrumb-item v-if="currentRoute?.meta?.title">
               {{ currentRoute.meta.title }}
             </el-breadcrumb-item>
@@ -73,9 +93,15 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessageBox } from 'element-plus'
+
+type MenuGroup = {
+  name: string
+  icon: string
+  routes: RouteRecordRaw[]
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -83,10 +109,10 @@ const userStore = useUserStore()
 
 const isCollapse = ref(false)
 
-const activeMenu = computed(() => route.path)
+const activeMenu = computed(() => (route.meta.activeMenu as string) || route.path)
 const currentRoute = computed(() => route)
 
-// 根据角色过滤菜单
+// 根据角色过滤菜单，再按赛事业务流程分组
 const menuRoutes = computed(() => {
   const routes = router.options.routes.find(r => r.path === '/')?.children || []
   const userRole = userStore.userInfo?.role
@@ -95,9 +121,35 @@ const menuRoutes = computed(() => {
     if (r.meta?.hidden) return false
     const roles = r.meta?.roles as string[] | undefined
     if (!roles || roles.length === 0) return true
-    return userRole && roles.includes(userRole)
+    return Boolean(userRole && roles.includes(userRole))
   })
 })
+
+const menuGroups = computed<MenuGroup[]>(() => {
+  const groups = new Map<string, MenuGroup>()
+
+  menuRoutes.value.forEach(item => {
+    const name = String(item.meta?.menuGroup || '')
+    const key = name || `__single__${item.path}`
+    const existing = groups.get(key)
+
+    if (existing) {
+      existing.routes.push(item)
+    } else {
+      groups.set(key, {
+        name,
+        icon: String(item.meta?.menuGroupIcon || item.meta?.icon || 'Menu'),
+        routes: [item]
+      })
+    }
+  })
+
+  return Array.from(groups.values())
+})
+
+function getMenuPath(item: RouteRecordRaw) {
+  return item.path.startsWith('/') ? item.path : `/${item.path}`
+}
 
 function toggleCollapse() {
   isCollapse.value = !isCollapse.value
