@@ -87,6 +87,7 @@
             <span v-else>{{ row.laneNo ?? row.startOrder ?? '—' }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="检录编号" prop="checkinCode" width="125" />
         <el-table-column label="参赛者/队伍" min-width="150">
           <template #default="{ row }">
             <div>{{ row.participantName || row.teamName || '—' }}</div>
